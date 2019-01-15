@@ -1,0 +1,22 @@
+{
+  "name": "amphora-passport",
+  "version": "0.0.1",
+  "description": "An adapter for Amphora & Passport.js ",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "basic-auth": "^2.0.1",
+    "connect-redis": "^3.4.0",
+    "express-flash": "0.0.2",
+    "express-session": "^1.15.6",
+    "handlebars": "^4.0.12",
+    "passport": "^0.3.2",
+    "passport-google-oauth": "^1.0.0",
+    "passport-http-header-token": "^1.1.0",
+    "passport-ldapauth": "^2.1.1"
+  }
+}
