@@ -25,7 +25,7 @@ function encode(username, provider) {
  * @returns {string}
  */
 function getAuthUrl(site) {
-  var base = references.uriToUrl(site.prefix, site.protocol, site.port);
+  const base = references.uriToUrl(site.prefix, site.protocol, site.port);
 
   return _last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
 }
@@ -59,18 +59,17 @@ function getCallbackUrl(site, provider) {
  */
 function verify(properties) {
   return function (req, token, tokenSecret, profile, done) { // eslint-disable-line
-    var username = _get(profile, properties.username),
+    const username = _get(profile, properties.username),
       imageUrl = _get(profile, properties.imageUrl),
       name = _get(profile, properties.name),
-      provider = properties.provider,
-      uid;
+      provider = properties.provider;
 
     if (!username) {
       throw new Error('Provider hasn\'t given a username at ' + properties.username);
     }
 
     // get UID
-    uid = `/_users/${encode(`${username.toLowerCase()}`, provider)}`;
+    let uid = `/_users/${encode(`${username.toLowerCase()}`, provider)}`;
 
     if (!req.user) {
       // first time logging in! update the user data
