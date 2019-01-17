@@ -1,8 +1,10 @@
 'use strict';
 
-const _ = require('lodash'),
+const _get = require('lodash/get'),
+  _last = require('lodash/last'),
+  _defaults = require('lodash/defaults'),
   references = require('./references');
-var db; // Storage module passed from Amphora. Assigned value at initialization
+let db; // Storage module passed from Amphora. Assigned value at initialization
 
 /**
  * encode username and provider to base64
@@ -25,7 +27,7 @@ function encode(username, provider) {
 function getAuthUrl(site) {
   var base = references.uriToUrl(site.prefix, site.protocol, site.port);
 
-  return _.last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
+  return _last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
 }
 
 /**
@@ -57,9 +59,9 @@ function getCallbackUrl(site, provider) {
  */
 function verify(properties) {
   return function (req, token, tokenSecret, profile, done) { // eslint-disable-line
-    var username = _.get(profile, properties.username),
-      imageUrl = _.get(profile, properties.imageUrl),
-      name = _.get(profile, properties.name),
+    var username = _get(profile, properties.username),
+      imageUrl = _get(profile, properties.imageUrl),
+      name = _get(profile, properties.name),
       provider = properties.provider,
       uid;
 
@@ -75,7 +77,7 @@ function verify(properties) {
       return db.get(uid)
         .then(function (data) {
           // only update the user data if the property doesn't exist (name might have been changed through the kiln UI)
-          return _.defaults(data, {
+          return _defaults(data, {
             imageUrl: imageUrl,
             name: name
           });
@@ -86,24 +88,43 @@ function verify(properties) {
             .catch(e => done(e));
         })
         .catch(e => {
-          console.log(e)
+          console.log(e);
           done(null, false, { message: 'User not found!' });
         }); // no user found
     } else {
-      console.log('&&&')
+      console.log('&&&');
       // already authenticated. just grab the user data
       return db.get(uid)
         .then((data) => done(null, data))
         .catch(e => {
-          console.log('%%%%', e)
-          done(null, false, { message: 'User not found!' })
+          console.log('%%%%', e);
+          done(null, false, { message: 'User not found!' });
         }); // no user found
     }
   };
 }
 
+/**
+ * Finds prefixToken, and removes it and anything before it.
+ *
+ * @param {string} str
+ * @param {string} prefixToken
+ * @returns {string}
+ */
+function removePrefix(str, prefixToken) {
+  const index =  str.indexOf(prefixToken);
+
+  if (index > -1) {
+    str = str.substring(index + prefixToken.length).trim();
+  }
+
+  return str;
+}
+
+module.exports.encode = encode;
 module.exports.setDb = storage => db = storage;
 module.exports.getPathOrBase = getPathOrBase;
 module.exports.getAuthUrl = getAuthUrl;
 module.exports.getCallbackUrl = getCallbackUrl;
 module.exports.verify = verify;
+module.exports.removePrefix = removePrefix;

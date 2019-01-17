@@ -1,30 +1,29 @@
 'use strict';
-const _ = require('lodash'),
-  { SECRET } = require('./constants'),
-  login = require('./login'),
-  utils = require('./utils'),
-
+const _get = require('lodash/get'),
+  _includes = require('lodash/includes'),
+  _isEmpty = require('lodash/isEmpty'),
+  _each = require('lodash/each'),
   session = require('express-session'),
   flash = require('express-flash'),
-
   passport = require('passport'),
-  // { getAuthUrl, setDb } = require('./utils'),
-  // session = require('express-session'),
-  // flash = require('express-flash'),
-  // basicAuth = require('basic-auth'),
-  // strategies = require('./strategies'),
+  { getProviders, createStrategy, addAuthRoutes } = require('./strategies'),
+  { SECRET } = require('./constants'),
+  login = require('./login'),
+  sessionStore = require('./session-store'),
+  utils = require('./utils'),
   AUTH_LEVELS_MAP = {
     ADMIN: 'admin',
     WRITE: 'write'
   };
-var db;
+
+let db;
 
 function unauthorized(res) {
   const err = new Error('Unauthorized request'),
-    message = removePrefix(err.message, ':'),
+    message = utils.removePrefix(err.message, ':'),
     code = 401;
 
-  res.stats(code).json({ code, message })
+  res.stats(code).json({ code, message });
 }
 
 /**
@@ -60,7 +59,7 @@ function checkAuthLevel(userLevel, requiredLevel) {
  */
 function withAuthLevel(requiredLevel) {
   return function (req, res, next) {
-    if (checkAuthLevel(_.get(req, 'user.auth', ''), requiredLevel)) {
+    if (checkAuthLevel(_get(req, 'user.auth', ''), requiredLevel)) {
       // If the user exists and meets the level requirement, let the request proceed
       next();
     } else {
@@ -80,17 +79,6 @@ function isProtectedRoute(req) {
   return !!req.query.edit || req.method !== 'GET';
 }
 
-
-/**
- * get the proper site path for redirects
- * note: this is needed because some sites have emptystring paths
- * @param {object} site
- * @returns {string}
- */
-function getPathOrBase(site) {
-  return site.path || '/';
-}
-
 /**
  * protect routes
  * @param {object} site
@@ -104,13 +92,13 @@ function isAuthenticated(site) {
       // try to authenticate with api key
       passport.authenticate('apikey', { session: false})(req, res, next);
     } else {
-      console.log('isAuthenticated', req.user)
+      console.log('isAuthenticated', req.user);
       req.session.returnTo = req.originalUrl; // redirect to this page after logging in
       // otherwise redirect to login
       res.redirect(`${utils.getAuthUrl(site)}/login`);
     }
   };
-};
+}
 
 
 
@@ -118,12 +106,12 @@ function isAuthenticated(site) {
 // note: pull user data from the database,
 // so requests in the same session will get updated user data
 function serializeUser(user, done) {
-  console.log('user', user, 'foo')
+  console.log('user', user, 'foo');
   done(null, utils.encode(user.username.toLowerCase(), user.provider));
 }
 
 function deserializeUser(uid, done) {
-  console.log('!&!&!&!&!&!')
+  console.log('!&!&!&!&!&!');
   return db.get(`/_users/${uid}`)
     .then(user => done(null, user))
     .catch(e => done(e));
@@ -146,8 +134,8 @@ function rejectBasicAuth(res) {
  */
 function protectRoutes(site) {
   return function (req, res, next) {
-    console.log('protect', req.user)
-    if (req.method !== 'OPTIONS' && amphoraPassport.isProtectedRoute(req)) { // allow mocking of these for testing
+    console.log('protect', req.user);
+    if (req.method !== 'OPTIONS' && isProtectedRoute(req)) { // allow mocking of these for testing
       module.exports.isAuthenticated(site)(req, res, next);
     } else {
       next();
@@ -166,7 +154,7 @@ function onLogin(tpl, site, currentProviders) {
   return function (req, res) {
     var flash = req.flash();
 
-    if (flash && _.includes(flash.error, 'Invalid username/password')) {
+    if (flash && _includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
       res.setHeader('WWW-Authenticate', 'Basic realm="Incorrect Credentials"');
       res.end('Access denied');
@@ -181,7 +169,7 @@ function onLogin(tpl, site, currentProviders) {
       // going to use varnish to automatically redirect them back to the ldap auth
     } else {
       res.send(tpl({
-        path: getPathOrBase(site),
+        path: utils.getPathOrBase(site),
         flash: flash,
         currentProviders: currentProviders,
         user: req.user,
@@ -241,7 +229,7 @@ function checkAuthentication(site) {
 //   // Get the db object into the util module's scope
 //   setDb(storage);
 
-//   if (_.isEmpty(providers)) {
+//   if (_isEmpty(providers)) {
 //     return []; // exit early if no providers are passed in
 //   }
 
@@ -281,31 +269,18 @@ function checkAuthentication(site) {
 //   return currentProviders; // for testing/verification
 // }
 
-function init(router, providers, site, storage, createStrategy, addAuthRoutes) {
-  const tpl = login.compileLoginPage('login.handlebars'),
-    sessionStore = require('./session-store')(),
-    // icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout'],
-    currentProviders = _.map(_.reject(providers, (provider) => provider === 'apikey'), function (provider) {
-      return {
-        name: provider,
-        url: `${utils.getAuthUrl(site)}/${provider}`,
-        title: `Log in with ${_.capitalize(provider)}`,
-        icon: _.constant(provider) // a function that returns the provider
-      };
-    });
-
-  db = storage;
-
-  if (_.isEmpty(providers)) {
+function init(router, providers, site, storage) {
+  if (_isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
 
-  // add svgs to handlebars
-  // _.each(icons, function (icon) {
-  //   handlebars.registerPartial(icon, login.compileTemplate(`${icon}.svg`));
-  // });
+  const tpl = login.compileLoginPage('login.handlebars'),
+    currentProviders = getProviders(providers, site);
 
-  _.each(providers, createStrategy(site)); // allow mocking this in tests
+  db = storage;
+  utils.setDb(db);
+
+  createStrategy(providers, site); // allow mocking this in tests
 
   // init session authentication
   router.use(session({
@@ -317,7 +292,7 @@ function init(router, providers, site, storage, createStrategy, addAuthRoutes) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
     },
-    store: sessionStore
+    store: sessionStore(),
   }));
   router.use(passport.initialize());
   router.use(passport.session());
@@ -331,7 +306,7 @@ function init(router, providers, site, storage, createStrategy, addAuthRoutes) {
   // rather than as route controllers in lib/routes/
   router.get('/_auth/login', onLogin(tpl, site, currentProviders));
   router.get('/_auth/logout', onLogout(site));
-  _.each(providers, addAuthRoutes(router, site)); // allow mocking this in tests
+  addAuthRoutes(providers, router, site); // allow mocking this in tests
 
   // handle de-authentication errors. This occurs when a user is logged in
   // and someone removes them as a user. We need to catch the error
@@ -348,9 +323,7 @@ module.exports.utils = utils;
 // for testing
 module.exports.isProtectedRoute = isProtectedRoute;
 module.exports.isAuthenticated = isAuthenticated;
-module.exports.getPathOrBase = getPathOrBase;
 module.exports.rejectBasicAuth = rejectBasicAuth;
-// module.exports.checkCredentials = checkCredentials;
 module.exports.protectRoutes = protectRoutes;
 module.exports.checkAuthentication = checkAuthentication;
 module.exports.serializeUser = serializeUser;

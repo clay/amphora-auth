@@ -1,10 +1,10 @@
 'use strict';
 
-const _ = require('lodash'),
-  fs = require('fs'),
+const _map = require('lodash/map'),
+  _capitalize = require('lodash/capitalize'),
+  _constant = require('lodash/constant'),
+  _reject = require('lodash/reject'),
   utils = require('../utils'),
-  path = require('path'),
-  handlebars = require('handlebars'),
   STRATEGIES = {
     google: require('./google'),
     ldap: require('./ldap'),
@@ -12,23 +12,23 @@ const _ = require('lodash'),
   };
 
 function getProviders(providers, site) {
-  return _.map(_.reject(providers, (provider) => provider === 'apikey'), provider => {
+  return _map(_reject(providers, (provider) => provider === 'apikey'), provider => {
     return {
       name: provider,
       url: `${utils.getAuthUrl(site)}/${provider}`,
-      title: `Log in with ${_.capitalize(provider)}`,
-      icon: _.constant(provider) // a function that returns the provider
+      title: `Log in with ${_capitalize(provider)}`,
+      icon: _constant(provider) // a function that returns the provider
     };
   });
 }
 
 /**
  * create the specified provider strategy
+ * @param {object} providers
  * @param {object} site
  * @throws {Error} if unsupported strategy
- * @returns {Function}
  */
-function createStrategy(router, providers, site) {
+function createStrategy(providers, site) {
   // Add API Key auth
   STRATEGIES.apikey(site);
 
@@ -51,5 +51,3 @@ function addAuthRoutes(providers, router, site) {
 module.exports.addAuthRoutes = addAuthRoutes;
 module.exports.createStrategy = createStrategy;
 module.exports.getProviders = getProviders;
-module.exports.compileLoginPage = compileLoginPage;
-module.exports.compileTemplate = compileTemplate;

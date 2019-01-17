@@ -2,7 +2,7 @@
 
 const passport = require('passport'),
   GoogleStrategy = require('passport-google-oauth').OAuth2Strategy,
-  utils = require('../utils');
+  { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
 
 /**
  * Google authenticatio strategy
@@ -10,26 +10,14 @@ const passport = require('passport'),
  * @param {object} site
  */
 function createGoogleStrategy(site) {
-  // passport.use(`google-${site.slug}`, new GoogleStrategy({
-  //   clientID: process.env.GOOGLE_CONSUMER_KEY,
-  //   clientSecret: process.env.GOOGLE_CONSUMER_SECRET,
-  //   callbackURL: utils.getCallbackUrl(site, 'google'),
-  //   passReqToCallback: true
-  // },
-  // utils.verify({
-  //   username: 'emails[0].value',
-  //   imageUrl: 'photos[0].value',
-  //   name: 'displayName',
-  //   provider: 'google'
-  // }, site)));
-
   passport.use(`google-${site.slug}`, new GoogleStrategy({
     clientID: process.env.GOOGLE_CONSUMER_KEY,
     clientSecret: process.env.GOOGLE_CONSUMER_SECRET,
-    callbackURL: utils.getCallbackUrl(site, 'google'),
+    callbackURL: getCallbackUrl(site, 'google'),
     passReqToCallback: true
   },
-  utils.verify({
+
+  verify({
     username: 'emails[0].value',
     imageUrl: 'photos[0].value',
     name: 'displayName',
@@ -37,24 +25,23 @@ function createGoogleStrategy(site) {
   }, site)));
 }
 
-
-
 /**
  * add authorization routes to the router
  * @param {express.Router} router
  * @param {object} site
- * @returns {Function}
+ * @param {object} provider
  */
 function addAuthRoutes(router, site, provider) {
   router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`, { scope: [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email'
-  ] }));
+  ]}));
 
   router.get(`/_auth/${provider}/callback`, passport.authenticate(`${provider}-${site.slug}`, {
-    failureRedirect: `${utils.getAuthUrl(site)}/login`,
+    failureRedirect: `${getAuthUrl(site)}/login`,
     failureFlash: true,
-    successReturnToOrRedirect: utils.getPathOrBase(site) })); // redirect to previous page or site root
+    successReturnToOrRedirect: getPathOrBase(site)
+  })); // redirect to previous page or site root
 }
 
 module.exports = createGoogleStrategy;

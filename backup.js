@@ -1,5 +1,7 @@
 'use strict';
-const _ = require('lodash'),
+const _get = require('lodash/get'),
+  _includes = require('lodash/includes'),
+  _isEmpty = require('lodash/isEmpty'),
   { SECRET } = require('./constants'),
   passport = require('passport'),
   { getAuthUrl, setDb } = require('./utils'),
@@ -54,7 +56,7 @@ function checkAuthLevel(userLevel, requiredLevel) {
  */
 function withAuthLevel(requiredLevel) {
   return function (req, res, next) {
-    if (checkAuthLevel(_.get(req, 'user.auth', ''), requiredLevel)) {
+    if (checkAuthLevel(_get(req, 'user.auth', ''), requiredLevel)) {
       // If the user exists and meets the level requirement, let the request proceed
       next();
     } else {
@@ -182,7 +184,7 @@ function onLogin(tpl, site, currentProviders) {
   return function (req, res) {
     var flash = req.flash();
 
-    if (flash && _.includes(flash.error, 'Invalid username/password')) {
+    if (flash && _includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
       res.setHeader('WWW-Authenticate', 'Basic realm="Incorrect Credentials"');
       res.end('Access denied');
@@ -257,7 +259,7 @@ function init(router, providers, site, storage) {
   // Get the db object into the util module's scope
   setDb(storage);
 
-  if (_.isEmpty(providers)) {
+  if (_isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
 

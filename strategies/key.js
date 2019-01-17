@@ -27,5 +27,9 @@ function createAPIKeyStrategy() {
   passport.use('apikey', new APIKeyStrategy({}, apiCallback));
 }
 
+function addAuthRoutes(router, site, provider) {
+  router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`));
+}
 
 module.exports = createAPIKeyStrategy;
+module.exports.addAuthRoutes = addAuthRoutes;

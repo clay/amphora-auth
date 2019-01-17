@@ -2,11 +2,12 @@
 
 const session = require('express-session'),
   RedisStore = require('connect-redis')(session),
-  sessionPrefix = process.env.REDIS_DB ? `${process.env.REDIS_DB}-clay-session:` : 'clay-session:';
+  { REDIS_DB, REDIS_SESSION_HOST } = process.env,
+  sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:';
 
 function createSessionStore() {
   const store = new RedisStore({
-    url: process.env.REDIS_SESSION_HOST,
+    url: REDIS_SESSION_HOST,
     prefix: sessionPrefix
   });
 
@@ -14,7 +15,7 @@ function createSessionStore() {
   // to have a higher max listener cap. we're setting it to 0 to disable the cap
   store.setMaxListeners(0);
 
-  console.log('store', store)
+  // console.log('store', store);
 
   return store;
 }
