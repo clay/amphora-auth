@@ -2,6 +2,7 @@
 
 const session = require('express-session'),
   RedisStore = require('connect-redis')(session),
+  { SECRET } = require('./constants'),
   { REDIS_DB, REDIS_SESSION_HOST } = process.env,
   sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:';
 
@@ -15,9 +16,17 @@ function createSessionStore() {
   // to have a higher max listener cap. we're setting it to 0 to disable the cap
   store.setMaxListeners(0);
 
-  // console.log('store', store);
-
-  return store;
+  return session({
+    secret: SECRET,
+    resave: false, // please use a session store (like connect-redis) that supports .touch()
+    saveUninitialized: false,
+    rolling: true,
+    name: 'clay-session',
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+    },
+    store,
+  });
 }
 
 module.exports = createSessionStore;

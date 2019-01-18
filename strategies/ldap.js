@@ -43,6 +43,35 @@ function createLDAPStrategy(site) {
 }
 
 /**
+ * when LDAP auth fails, ask for username + password natively
+ * @param {object} res
+ */
+function rejectBasicAuth(res) {
+  res.statusCode = 401;
+  res.setHeader('WWW-Authenticate', 'Basic');
+  res.end('Access denied');
+}
+
+/**
+ * check credentials, ask for login prompt if they don't exist
+ * @param {object} req
+ * @param {object} res
+ * @param {function} next
+ * @returns {function} if no credentials
+ */
+function checkCredentials(req, res, next) {
+  const credentials = basicAuth(req);
+
+  if (!credentials) {
+    // show native login prompt if user hasn't sent credentials
+    return rejectBasicAuth(res);
+  } else {
+    // authenticate those credentials against ldap
+    next();
+  }
+}
+
+/**
  * add authorization routes to the router
  * @param {express.Router} router
  * @param {object} site

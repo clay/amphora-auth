@@ -86,19 +86,14 @@ function verify(properties) {
             .then(() => done(null, data))
             .catch(e => done(e));
         })
-        .catch(e => {
-          console.log(e);
+        .catch(() => {
           done(null, false, { message: 'User not found!' });
         }); // no user found
     } else {
-      console.log('&&&');
       // already authenticated. just grab the user data
       return db.get(uid)
         .then((data) => done(null, data))
-        .catch(e => {
-          console.log('%%%%', e);
-          done(null, false, { message: 'User not found!' });
-        }); // no user found
+        .catch(() => done(null, false, { message: 'User not found!' })); // no user found
     }
   };
 }

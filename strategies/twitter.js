@@ -1,27 +1,27 @@
 'use strict';
 
 const passport = require('passport'),
-  GoogleStrategy = require('passport-google-oauth').OAuth2Strategy,
+  TwitterStrategy = require('passport-twitter-oauth').OAuth2Strategy,
   { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
 
 /**
- * Google authenticatio strategy
+ * Twitter authenticatio strategy
  *
  * @param {object} site
  */
-function createGoogleStrategy(site) {
-  console.log('Creating google strategy');
-  passport.use(`google-${site.slug}`, new GoogleStrategy({
-    clientID: process.env.GOOGLE_CONSUMER_KEY,
-    clientSecret: process.env.GOOGLE_CONSUMER_SECRET,
-    callbackURL: getCallbackUrl(site, 'google'),
+function createTwitterStrategy(site) {
+  console.log('Creating twitter strategy');
+  passport.use(`twitter-${site.slug}`, new TwitterStrategy({
+    consumerKey: process.env.TWITTER_CONSUMER_KEY,
+    consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
+    callbackURL: getCallbackUrl(site, 'twitter'),
     passReqToCallback: true
   },
   verify({
-    username: 'emails[0].value',
+    username: 'username',
     imageUrl: 'photos[0].value',
     name: 'displayName',
-    provider: 'google'
+    provider: 'twitter'
   }, site)));
 }
 
@@ -32,10 +32,7 @@ function createGoogleStrategy(site) {
  * @param {object} provider
  */
 function addAuthRoutes(router, site, provider) {
-  router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`, { scope: [
-    'https://www.googleapis.com/auth/userinfo.profile',
-    'https://www.googleapis.com/auth/userinfo.email'
-  ]}));
+  router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`));
 
   router.get(`/_auth/${provider}/callback`, passport.authenticate(`${provider}-${site.slug}`, {
     failureRedirect: `${getAuthUrl(site)}/login`,
@@ -44,5 +41,5 @@ function addAuthRoutes(router, site, provider) {
   })); // redirect to previous page or site root
 }
 
-module.exports = createGoogleStrategy;
+module.exports = createTwitterStrategy;
 module.exports.addAuthRoutes = addAuthRoutes;

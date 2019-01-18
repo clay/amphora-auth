@@ -1,7 +1,8 @@
 'use strict';
 
 const passport = require('passport'),
-  APIKeyStrategy = require('passport-http-header-token').Strategy;
+  APIKeyStrategy = require('passport-http-header-token').Strategy,
+  { getAuthUrl, getPathOrBase } = require('../utils');
 
 /**
  * api key callback, checks to see if api key provided matches env variable
@@ -24,11 +25,18 @@ function apiCallback(apikey, done) {
  * @param {object} site
  */
 function createAPIKeyStrategy() {
+  console.log('Creating apikey strategy');
   passport.use('apikey', new APIKeyStrategy({}, apiCallback));
 }
 
 function addAuthRoutes(router, site, provider) {
   router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`));
+
+  router.get(`/_auth/${provider}/callback`, passport.authenticate(`${provider}-${site.slug}`, {
+    failureRedirect: `${getAuthUrl(site)}/login`,
+    failureFlash: true,
+    successReturnToOrRedirect: getPathOrBase(site)
+  })); // redirect to previous page or site root
 }
 
 module.exports = createAPIKeyStrategy;

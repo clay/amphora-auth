@@ -29,15 +29,21 @@ function getProviders(providers, site) {
  * @throws {Error} if unsupported strategy
  */
 function createStrategy(providers, site) {
+  console.log('createStrategy');
   // Add API Key auth
-  STRATEGIES.apikey(site);
+  STRATEGIES.apikey();
 
   providers.forEach(provider => {
     if (!STRATEGIES[provider]) {
       throw new Error(`Unknown provider: ${provider}!`);
     }
 
-    STRATEGIES[provider](site);
+    if (provider !== 'apikey') {
+      console.log(`Creating strategy for ${provider}-${site}`);
+      const providerStrategy = STRATEGIES[provider];
+
+      providerStrategy(site);
+    }
   });
 }
 
