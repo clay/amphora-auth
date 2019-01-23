@@ -1,7 +1,7 @@
 'use strict';
 
 const passport = require('passport'),
-  TwitterStrategy = require('passport-twitter-oauth').OAuth2Strategy,
+  TwitterStrategy = require('passport-twitter').Strategy,
   { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
 
 /**

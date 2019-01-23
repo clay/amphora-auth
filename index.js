@@ -1,20 +1,24 @@
 'use strict';
 const _get = require('lodash/get'),
-  _each = require('lodash/each'),
   _isEmpty = require('lodash/isEmpty'),
   _includes = require('lodash/includes'),
   passport = require('passport'),
   flash = require('express-flash'),
   { compileLoginPage } = require('./login'),
-  { encode, getAuthUrl, getPathOrBase, removePrefix } = require('./utils'),
+  {
+    getAuthUrl,
+    getPathOrBase,
+    removePrefix,
+    setDb,
+    serializeUser,
+    deserializeUser
+  } = require('./utils'),
   sessionStore = require('./session-store'),
-  { getProviders, addAuthRoutes } = require('./strategies'),
+  { getProviders, addAuthRoutes, createStrategy } = require('./strategies'),
   AUTH_LEVELS_MAP = {
     ADMIN: 'admin',
     WRITE: 'write',
   };
-
-let db;
 
 function unauthorized(res) {
   const err = new Error('Unauthorized request'),
@@ -95,23 +99,6 @@ function isAuthenticated(site) {
       res.redirect(`${getAuthUrl(site)}/login`);
     }
   };
-}
-
-// serialize and deserialize users into the session
-// note: pull user data from the database,
-// so requests in the same session will get updated user data
-function serializeUser(user, done) {
-  done(null, encode(user.username.toLowerCase(), user.provider));
-}
-
-function deserializeUser(uid, done) {
-  return db.get(`/_users/${uid}`)
-    .then(function (user) {
-      done(null, user);
-    })
-    .catch(function (e) {
-      done(e);
-    });
 }
 
 passport.serializeUser(serializeUser);
@@ -214,12 +201,12 @@ function init(router, providers, site, storage) {
     return []; // exit early if no providers are passed in
   }
 
-  db = storage;
+  setDb(storage);
 
   const tpl = compileLoginPage('login.handlebars'),
     currentProviders = getProviders(providers, site);
 
-  _each(providers, module.exports.createStrategy(site)); // allow mocking this in tests
+  createStrategy(providers, site); // allow mocking this in tests
 
   // init session authentication
   router.use(sessionStore());
@@ -244,19 +231,14 @@ function init(router, providers, site, storage) {
   return currentProviders; // for testing/verification
 }
 
-module.exports.init = init;
+module.exports = init;
 module.exports.withAuthLevel = withAuthLevel;
 module.exports.authLevels = AUTH_LEVELS_MAP;
 
 // for testing
 module.exports.isProtectedRoute = isProtectedRoute;
 module.exports.isAuthenticated = isAuthenticated;
-module.exports.getPathOrBase = getPathOrBase;
-module.exports.addAuthRoutes = addAuthRoutes;
 module.exports.protectRoutes = protectRoutes;
 module.exports.checkAuthentication = checkAuthentication;
-module.exports.serializeUser = serializeUser;
-module.exports.deserializeUser = deserializeUser;
 module.exports.onLogin = onLogin;
 module.exports.onLogout = onLogout;
-module.exports.setDb = mock => db = mock;

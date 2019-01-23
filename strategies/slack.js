@@ -1,7 +1,7 @@
 'use strict';
 
 const passport = require('passport'),
-  SlackStrategy = require('passport-slack-oauth').OAuth2Strategy,
+  SlackStrategy = require('passport-slack').Strategy,
   { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
 
 /**

@@ -115,6 +115,23 @@ function removePrefix(str, prefixToken) {
   return str;
 }
 
+// serialize and deserialize users into the session
+// note: pull user data from the database,
+// so requests in the same session will get updated user data
+function serializeUser(user, done) {
+  done(null, encode(user.username.toLowerCase(), user.provider));
+}
+
+function deserializeUser(uid, done) {
+  return db.get(`/_users/${uid}`)
+    .then(function (user) {
+      done(null, user);
+    })
+    .catch(function (e) {
+      done(e);
+    });
+}
+
 module.exports.encode = encode;
 module.exports.setDb = storage => db = storage;
 module.exports.getPathOrBase = getPathOrBase;
@@ -122,3 +139,5 @@ module.exports.getAuthUrl = getAuthUrl;
 module.exports.getCallbackUrl = getCallbackUrl;
 module.exports.verify = verify;
 module.exports.removePrefix = removePrefix;
+module.exports.serializeUser = serializeUser;
+module.exports.deserializeUser = deserializeUser;

@@ -6,20 +6,20 @@ const _map = require('lodash/map'),
   _reject = require('lodash/reject'),
   utils = require('../utils'),
   STRATEGIES = {
+    apikey: require('./key'),
     google: require('./google'),
     ldap: require('./ldap'),
-    apikey: require('./key')
+    twitter: require('./twitter'),
+    slack: require('./slack')
   };
 
 function getProviders(providers, site) {
-  return _map(_reject(providers, (provider) => provider === 'apikey'), provider => {
-    return {
-      name: provider,
-      url: `${utils.getAuthUrl(site)}/${provider}`,
-      title: `Log in with ${_capitalize(provider)}`,
-      icon: _constant(provider) // a function that returns the provider
-    };
-  });
+  return _map(_reject(providers, provider => provider === 'apikey'), provider => ({
+    name: provider,
+    url: `${utils.getAuthUrl(site)}/${provider}`,
+    title: `Log in with ${_capitalize(provider)}`,
+    icon: _constant(provider) // a function that returns the provider
+  }));
 }
 
 /**
@@ -31,7 +31,7 @@ function getProviders(providers, site) {
 function createStrategy(providers, site) {
   console.log('createStrategy');
   // Add API Key auth
-  STRATEGIES.apikey();
+  STRATEGIES.apikey(site);
 
   providers.forEach(provider => {
     if (!STRATEGIES[provider]) {
@@ -39,10 +39,8 @@ function createStrategy(providers, site) {
     }
 
     if (provider !== 'apikey') {
-      console.log(`Creating strategy for ${provider}-${site}`);
-      const providerStrategy = STRATEGIES[provider];
-
-      providerStrategy(site);
+      console.log(`Creating strategy for ${provider}-${site.slug}`);
+      STRATEGIES[provider](site);
     }
   });
 }
