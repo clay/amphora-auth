@@ -2,7 +2,13 @@
 
 const passport = require('passport'),
   GoogleStrategy = require('passport-google-oauth').OAuth2Strategy,
-  { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
+  {
+    verify,
+    getAuthUrl,
+    getPathOrBase,
+    getCallbackUrl,
+    generateStrategyName,
+  } = require('../utils');
 
 /**
  * Google authenticatio strategy
@@ -31,12 +37,14 @@ function createGoogleStrategy(site) {
  * @param {object} provider
  */
 function addAuthRoutes(router, site, provider) {
-  router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`, { scope: [
+  const strategy = generateStrategyName(provider, site);
+
+  router.get(`/_auth/${provider}`, passport.authenticate(strategy, { scope: [
     'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/userinfo.email'
   ]}));
 
-  router.get(`/_auth/${provider}/callback`, passport.authenticate(`${provider}-${site.slug}`, {
+  router.get(`/_auth/${provider}/callback`, passport.authenticate(strategy, {
     failureRedirect: `${getAuthUrl(site)}/login`,
     failureFlash: true,
     successReturnToOrRedirect: getPathOrBase(site)

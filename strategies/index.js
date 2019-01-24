@@ -1,26 +1,12 @@
 'use strict';
 
-const _map = require('lodash/map'),
-  _capitalize = require('lodash/capitalize'),
-  _constant = require('lodash/constant'),
-  _reject = require('lodash/reject'),
-  utils = require('../utils'),
-  STRATEGIES = {
-    apikey: require('./key'),
-    google: require('./google'),
-    ldap: require('./ldap'),
-    twitter: require('./twitter'),
-    slack: require('./slack')
-  };
-
-function getProviders(providers, site) {
-  return _map(_reject(providers, provider => provider === 'apikey'), provider => ({
-    name: provider,
-    url: `${utils.getAuthUrl(site)}/${provider}`,
-    title: `Log in with ${_capitalize(provider)}`,
-    icon: _constant(provider) // a function that returns the provider
-  }));
-}
+const STRATEGIES = {
+  apikey: require('./key'),
+  google: require('./google'),
+  ldap: require('./ldap'),
+  twitter: require('./twitter'),
+  slack: require('./slack')
+};
 
 /**
  * create the specified provider strategy
@@ -40,7 +26,12 @@ function createStrategy(providers, site) {
     if (provider !== 'apikey') STRATEGIES[provider](site);
   });
 }
-
+/**
+ * add authorization routes to the router
+ * @param {string[]} providers
+ * @param {express.Router} router
+ * @param {object} site
+ */
 function addAuthRoutes(providers, router, site) {
   STRATEGIES.apikey.addAuthRoutes(router, site, 'apikey');
 
@@ -51,4 +42,3 @@ function addAuthRoutes(providers, router, site) {
 
 module.exports.addAuthRoutes = addAuthRoutes;
 module.exports.createStrategy = createStrategy;
-module.exports.getProviders = getProviders;

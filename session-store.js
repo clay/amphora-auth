@@ -6,6 +6,10 @@ const session = require('express-session'),
   { REDIS_DB, REDIS_SESSION_HOST } = process.env,
   sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:';
 
+/**
+ * Creates a new session with Redis Store.
+ * @returns {Object}
+ */
 function createSessionStore() {
   const store = new RedisStore({
     url: REDIS_SESSION_HOST,

@@ -3,7 +3,7 @@
 const passport = require('passport'),
   LDAPStrategy = require('passport-ldapauth'),
   basicAuth = require('basic-auth'),
-  { verify, getAuthUrl, getPathOrBase } = require('../utils');
+  { verify, getAuthUrl, getPathOrBase, generateStrategyName } = require('../utils');
 
 /**
  * verify LDAP auth a little differently
@@ -78,7 +78,9 @@ function checkCredentials(req, res, next) {
  * @param {object} provider
  */
 function addAuthRoutes(router, site, provider) {
-  router.get(`/_auth/${provider}`, checkCredentials, passport.authenticate(`${provider}-${site.slug}`, {
+  const strategy = generateStrategyName(provider, site);
+
+  router.get(`/_auth/${provider}`, checkCredentials, passport.authenticate(strategy, {
     // passport options
     failureRedirect: `${getAuthUrl(site)}/login`,
     failureFlash: true,

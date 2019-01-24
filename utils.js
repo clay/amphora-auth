@@ -3,6 +3,13 @@
 const _get = require('lodash/get'),
   _last = require('lodash/last'),
   _defaults = require('lodash/defaults'),
+  _map = require('lodash/map'),
+  _capitalize = require('lodash/capitalize'),
+  _constant = require('lodash/constant'),
+  _reject = require('lodash/reject'),
+  fs = require('fs'),
+  path = require('path'),
+  handlebars = require('handlebars'),
   references = require('./references');
 let db; // Storage module passed from Amphora. Assigned value at initialization
 
@@ -132,6 +139,40 @@ function deserializeUser(uid, done) {
     });
 }
 
+/**
+ * Generates a list of formatted providers
+ * @param {string[]} providers
+ * @param {Object} site
+ * @returns {Object[]}
+ */
+function getProviders(providers, site) {
+  return _map(_reject(providers, provider => provider === 'apikey'), provider => ({
+    name: provider,
+    url: `${getAuthUrl(site)}/${provider}`,
+    title: `Log in with ${_capitalize(provider)}`,
+    icon: _constant(provider) // a function that returns the provider
+  }));
+}
+
+/**
+ * Generates a string to set passport strategy.
+ * @param {string} provider
+ * @param {Object} site
+ * @returns {string}
+ */
+function generateStrategyName(provider, site) {
+  return `${provider}-${site.slug}`;
+}
+
+/**
+ * Compile a handlebars template
+ * @param {string} filename
+ * @returns {function}
+ */
+function compileTemplate(filename) {
+  return handlebars.compile(fs.readFileSync(path.resolve(__dirname, '.', 'views', filename), { encoding: 'utf-8' }));
+}
+
 module.exports.encode = encode;
 module.exports.setDb = storage => db = storage;
 module.exports.getPathOrBase = getPathOrBase;
@@ -141,3 +182,6 @@ module.exports.verify = verify;
 module.exports.removePrefix = removePrefix;
 module.exports.serializeUser = serializeUser;
 module.exports.deserializeUser = deserializeUser;
+module.exports.getProviders = getProviders;
+module.exports.generateStrategyName = generateStrategyName;
+module.exports.compileTemplate = compileTemplate;

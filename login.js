@@ -1,19 +1,13 @@
 'use strict';
 
 const _each = require('lodash/each'),
-  fs = require('fs'),
-  path = require('path'),
-  handlebars = require('handlebars');
+  handlebars = require('handlebars'),
+  { compileTemplate } = require('./utils');
 
 /**
- * compile a handlebars template
- * @param {string} filename
- * @returns {function}
+ * Creates the login page template.
+ * @returns {Handlebars.Template}
  */
-function compileTemplate(filename) {
-  return handlebars.compile(fs.readFileSync(path.resolve(__dirname, '.', 'views', filename), { encoding: 'utf-8' }));
-}
-
 function compileLoginPage() {
   const tpl = compileTemplate('login.handlebars'),
     icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout'];
@@ -27,4 +21,3 @@ function compileLoginPage() {
 }
 
 module.exports.compileLoginPage = compileLoginPage;
-module.exports.compileTemplate = compileTemplate;

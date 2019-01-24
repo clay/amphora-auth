@@ -2,7 +2,13 @@
 
 const passport = require('passport'),
   SlackStrategy = require('passport-slack').Strategy,
-  { verify, getAuthUrl, getPathOrBase, getCallbackUrl } = require('../utils');
+  {
+    verify,
+    getAuthUrl,
+    getPathOrBase,
+    getCallbackUrl,
+    generateStrategyName
+  } = require('../utils');
 
 /**
  * Slack authenticatio strategy
@@ -32,9 +38,11 @@ function createSlackStrategy(site) {
  * @param {object} provider
  */
 function addAuthRoutes(router, site, provider) {
-  router.get(`/_auth/${provider}`, passport.authenticate(`${provider}-${site.slug}`));
+  const strategy = generateStrategyName(provider, site);
 
-  router.get(`/_auth/${provider}/callback`, passport.authenticate(`${provider}-${site.slug}`, {
+  router.get(`/_auth/${provider}`, passport.authenticate(strategy));
+
+  router.get(`/_auth/${provider}/callback`, passport.authenticate(strategy, {
     failureRedirect: `${getAuthUrl(site)}/login`,
     failureFlash: true,
     successReturnToOrRedirect: getPathOrBase(site)

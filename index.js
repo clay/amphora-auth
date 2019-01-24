@@ -11,12 +11,17 @@ const _get = require('lodash/get'),
     removePrefix,
     setDb,
     serializeUser,
-    deserializeUser
+    deserializeUser,
+    getProviders
   } = require('./utils'),
   sessionStore = require('./session-store'),
-  { getProviders, addAuthRoutes, createStrategy } = require('./strategies'),
+  { addAuthRoutes, createStrategy } = require('./strategies'),
   { AUTH_LEVELS } = require('./constants');
 
+/**
+ * Creates an error message for unathorized requests.
+ * @param {Object} res
+ */
 function unauthorized(res) {
   const err = new Error('Unauthorized request'),
     message = removePrefix(err.message, ':'),
@@ -39,13 +44,7 @@ function checkAuthLevel(userLevel, requiredLevel) {
     throw new Error('User does not have an authentication level set');
   }
 
-  if (userLevel === AUTH_LEVELS.ADMIN) {
-    return true;
-  } else if (userLevel !== requiredLevel) {
-    return false;
-  } else {
-    return true;
-  }
+  return userLevel === AUTH_LEVELS.ADMIN || userLevel === requiredLevel;
 }
 
 /**
@@ -123,9 +122,10 @@ function protectRoutes(site) {
  * @param {array} currentProviders
  * @returns {function}
  */
-function onLogin(tpl, site, currentProviders) {
+function onLogin(site, currentProviders) {
   return function (req, res) {
-    const flash = req.flash();
+    const template = compileLoginPage(),
+      flash = req.flash();
 
     if (flash && _includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
@@ -141,7 +141,7 @@ function onLogin(tpl, site, currentProviders) {
       // note: all of the above is the default behavior in amphora, but we're
       // going to use varnish to automatically redirect them back to the ldap auth
     } else {
-      res.send(tpl({
+      res.send(template({
         path: getPathOrBase(site),
         flash: flash,
         currentProviders: currentProviders,
@@ -200,8 +200,7 @@ function init(router, providers, site, storage) {
 
   setDb(storage);
 
-  const tpl = compileLoginPage('login.handlebars'),
-    currentProviders = getProviders(providers, site);
+  const currentProviders = getProviders(providers, site);
 
   createStrategy(providers, site); // allow mocking this in tests
 
@@ -217,7 +216,7 @@ function init(router, providers, site, storage) {
   // add authorization routes
   // note: these (and the provider routes) are added here,
   // rather than as route controllers in lib/routes/
-  router.get('/_auth/login', onLogin(tpl, site, currentProviders));
+  router.get('/_auth/login', onLogin(site, currentProviders));
   router.get('/_auth/logout', onLogout(site));
   addAuthRoutes(providers, router, site); // allow mocking this in tests
 
@@ -237,5 +236,6 @@ module.exports.isProtectedRoute = isProtectedRoute;
 module.exports.isAuthenticated = isAuthenticated;
 module.exports.protectRoutes = protectRoutes;
 module.exports.checkAuthentication = checkAuthentication;
+module.exports.checkAuthLevel = checkAuthLevel;
 module.exports.onLogin = onLogin;
 module.exports.onLogout = onLogout;
