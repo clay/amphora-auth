@@ -15,10 +15,7 @@ const _get = require('lodash/get'),
   } = require('./utils'),
   sessionStore = require('./session-store'),
   { getProviders, addAuthRoutes, createStrategy } = require('./strategies'),
-  AUTH_LEVELS_MAP = {
-    ADMIN: 'admin',
-    WRITE: 'write',
-  };
+  { AUTH_LEVELS } = require('./constants');
 
 function unauthorized(res) {
   const err = new Error('Unauthorized request'),
@@ -42,7 +39,7 @@ function checkAuthLevel(userLevel, requiredLevel) {
     throw new Error('User does not have an authentication level set');
   }
 
-  if (userLevel === AUTH_LEVELS_MAP.ADMIN) {
+  if (userLevel === AUTH_LEVELS.ADMIN) {
     return true;
   } else if (userLevel !== requiredLevel) {
     return false;
@@ -233,7 +230,6 @@ function init(router, providers, site, storage) {
 
 module.exports = init;
 module.exports.withAuthLevel = withAuthLevel;
-module.exports.authLevels = AUTH_LEVELS_MAP;
 
 // for testing
 module.exports.isProtectedRoute = isProtectedRoute;
