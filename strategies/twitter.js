@@ -10,7 +10,6 @@ const passport = require('passport'),
  * @param {object} site
  */
 function createTwitterStrategy(site) {
-  console.log('Creating twitter strategy');
   passport.use(`twitter-${site.slug}`, new TwitterStrategy({
     consumerKey: process.env.TWITTER_CONSUMER_KEY,
     consumerSecret: process.env.TWITTER_CONSUMER_SECRET,

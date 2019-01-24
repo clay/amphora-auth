@@ -25,7 +25,6 @@ function apiCallback(apikey, done) {
  * @param {object} site
  */
 function createAPIKeyStrategy() {
-  console.log('Creating apikey strategy');
   passport.use('apikey', new APIKeyStrategy({}, apiCallback));
 }
 

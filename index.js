@@ -230,6 +230,7 @@ function init(router, providers, site, storage) {
 
 module.exports = init;
 module.exports.withAuthLevel = withAuthLevel;
+module.exports.authLevels = AUTH_LEVELS;
 
 // for testing
 module.exports.isProtectedRoute = isProtectedRoute;

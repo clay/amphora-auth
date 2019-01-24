@@ -10,7 +10,6 @@ const passport = require('passport'),
  * @param {object} site
  */
 function createSlackStrategy(site) {
-  console.log('Creating slack strategy');
   passport.use(`slack-${site.slug}`, new SlackStrategy({
     clientID: process.env.SLACK_CONSUMER_KEY,
     clientSecret: process.env.SLACK_CONSUMER_SECRET,

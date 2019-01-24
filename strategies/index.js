@@ -29,7 +29,6 @@ function getProviders(providers, site) {
  * @throws {Error} if unsupported strategy
  */
 function createStrategy(providers, site) {
-  console.log('createStrategy');
   // Add API Key auth
   STRATEGIES.apikey(site);
 
@@ -38,17 +37,15 @@ function createStrategy(providers, site) {
       throw new Error(`Unknown provider: ${provider}!`);
     }
 
-    if (provider !== 'apikey') {
-      console.log(`Creating strategy for ${provider}-${site.slug}`);
-      STRATEGIES[provider](site);
-    }
+    if (provider !== 'apikey') STRATEGIES[provider](site);
   });
 }
 
 function addAuthRoutes(providers, router, site) {
+  STRATEGIES.apikey.addAuthRoutes(router, site, 'apikey');
+
   providers.forEach(provider => {
-    // TODO: MAKE SURE API KEY ALWAYS GETS CALLED FIRST
-    STRATEGIES[provider].addAuthRoutes(router, site, provider);
+    if (provider !== 'apikey') STRATEGIES[provider].addAuthRoutes(router, site, provider);
   });
 }
 
