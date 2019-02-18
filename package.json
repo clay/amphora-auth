@@ -1,7 +1,7 @@
 {
   "name": "amphora-passport",
   "version": "0.0.1",
-  "description": "An adapter for Amphora & Passport.js ",
+  "description": "An adapter for Amphora & Passport.js",
   "main": "index.js",
   "scripts": {
     "lint": "eslint *.js",
