@@ -22,7 +22,7 @@ describe(_startCase(filename), function () {
       expect(clayLog.init).toBeCalled();
     });
 
-    it('returns if a log instance is set', function () {
+    it('returns undefined if a log instance is set', function () {
       lib.setLogger(fakeLog);
       fn();
       expect(clayLog.init).not.toBeCalled();

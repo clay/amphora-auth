@@ -55,6 +55,7 @@ function handleError(res) {
 }
 
 /**
+ * Sends a response with the desired format and status code.
  * @param {number} code
  * @param {string} message
  * @param {object} res
@@ -192,8 +193,9 @@ function varyWithoutExtension(options) {
 }
 
 /**
- * This method not allowed
- * @param {{allow: [string]}} options
+ * Middleware to restrict HTTP Methods in a route
+ * @param {Object} options
+ * @param {string[]} options.allow
  * @returns {function}
  */
 function methodNotAllowed(options) {
@@ -215,8 +217,9 @@ function methodNotAllowed(options) {
 }
 
 /**
- * This route not allowed
- * @param {{accept: [string]}} options
+ * Middleware to restrict Content Types in a route.
+ * @param {Object} options
+ * @param {string[]} options.accept
  * @returns {function}
  */
 function notAcceptable(options) {
