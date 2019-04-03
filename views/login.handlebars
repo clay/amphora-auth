@@ -79,6 +79,7 @@
       .buttons {
         display: flex;
         flex-flow: row wrap;
+        width: 100%;
       }
 
       .button {
@@ -183,15 +184,17 @@
           <span class="button-text">Log out</span>
         </a>
       {{else}}
-        {{#each currentProviders}}
+        {{#if currentProviders.length}}
           <div class="buttons">
-              <a class="button {{this.name}}" href="{{ this.url }}" title="{{ this.title }}">
-                <div class="button-icon">{{> ( icon ) }}</div>
-                <span class="button-text">{{ this.title }}</span>
-              </a>
+            {{#each currentProviders}}
+                <a class="button {{this.name}}" href="{{ this.url }}" title="{{ this.title }}">
+                  <div class="button-icon">{{> ( icon ) }}</div>
+                  <span class="button-text">{{ this.title }}</span>
+                </a>
+            {{/each}}
           </div>
-        {{/each}}
-        {{#if currentProviders.length}}<p class="separator">or</p>{{/if}}
+          <p class="separator">or</p>
+        {{/if}}
         <form class="login-form" action="{{path}}/_auth/local" method="post">
           <input id="username" name="username" type="text" placeholder="Username" />
           <input id="password" name="password" type="password" placeholder="Password" />
