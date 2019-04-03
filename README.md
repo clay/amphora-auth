@@ -25,14 +25,14 @@ amphoraAuth({
 
 ## Authentication
 
-This module provides authenticating users in Clay locally with an username and password or using third-party providers. Here's a list of the supported providers:
+This module provides local authentication in Clay with a username and password and allows for easy configuration of Oauth for authentication with third-party providers. Here's a list of the supported providers:
 
 - Google
 - Twitter
 - Slack
 - LDAP
 
-We'll also have to create a user account to edit pages in Clay. The easiest way to do this is to create a `user.yml` file that looks like this:
+To get started editing in Clay, create a user account. The easiest way to do this is to create a `user.yml` file that looks like this:
 
 ```yml
 _users:
@@ -47,7 +47,7 @@ _users:
     auth: admin
 ```
 
-And import them using [claycli](https://github.com/clay/claycli):
+And import the configuration using [claycli](https://github.com/clay/claycli):
 
 ```bash
 cat user.yml | clay import -k <local_api_key> -y localhost
@@ -55,7 +55,7 @@ cat user.yml | clay import -k <local_api_key> -y localhost
 
 ## Environmental Variables
 
-The following are the required env variables needed to use the providers for authentication:
+The following env variables are required in order to be able to authenticate a user through the providers:
 
 ```bash
 export CLAY_PROVIDER=google
