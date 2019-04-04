@@ -1,7 +1,6 @@
 'use strict';
 
 const _get = require('lodash/get'),
-  _last = require('lodash/last'),
   _defaults = require('lodash/defaults'),
   _map = require('lodash/map'),
   _capitalize = require('lodash/capitalize'),
@@ -27,15 +26,24 @@ function encode(username, provider) {
 }
 
 /**
+ * Gets the base site path
+ * @param {Object} site
+ * @returns {string}
+ */
+function getBasePath(site) {
+  return references.uriToUrl(site.prefix, site.protocol, site.port);
+}
+
+/**
  * get the proper /auth url for a site
  * note: needs to add/not add initial slash, depending on the site path
  * @param {object} site
  * @returns {string}
  */
 function getAuthUrl(site) {
-  const base = references.uriToUrl(site.prefix, site.protocol, site.port);
+  const base = getBasePath(site);
 
-  return _last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
+  return `${base}_auth`;
 }
 
 /**
@@ -45,7 +53,7 @@ function getAuthUrl(site) {
  * @returns {string}
  */
 function getPathOrBase(site) {
-  return site.path || '/';
+  return site.path || getBasePath(site) || '/';
 }
 
 /**

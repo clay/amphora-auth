@@ -11,7 +11,7 @@ const urlParse = require('url');
  */
 function uriToUrl(uri, protocol, port) {
   // just pretend to start with http; it's overwritten two lines down
-  const parts = urlParse.parse(`http://${uri}`);
+  const parts = urlParse.parse(`http://${uri}/`);
 
   parts.protocol = protocol || 'http';
   parts.port = port || process.env.PORT;
