@@ -11,7 +11,7 @@ const _isEmpty = require('lodash/isEmpty'),
     deserializeUser,
     getProviders
   } = require('./utils'),
-  sessionStore = require('./services/session-store'),
+  createSessionStore = require('./services/session-store'),
   { addAuthRoutes, createStrategy } = require('./strategies'),
   { AUTH_LEVELS } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
@@ -155,7 +155,7 @@ function addUser(req, res, next) {
  * @param {object} params.storage
  * @returns {object[]}
  */
-function init({ router, providers, site, storage, bus }) {
+function init({ router, providers, store, site, storage, bus }) {
   if (_isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
@@ -168,7 +168,7 @@ function init({ router, providers, site, storage, bus }) {
   createStrategy(providers, site); // allow mocking this in tests
 
   // init session authentication
-  router.use(sessionStore());
+  router.use(createSessionStore(store));
   router.use(passport.initialize());
   router.use(passport.session());
   router.use(flash());
