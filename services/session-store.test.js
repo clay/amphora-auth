@@ -16,8 +16,18 @@ describe(_startCase(filename), function () {
       lib.setSession(fakeSession);
     });
 
-    it('should create a session with redisStore', function () {
+    it('should create a session with a new redisStore', function () {
       lib();
+
+      expect(fakeSession).toBeCalled();
+    });
+
+    it('should create a session with an existing redisStore', function () {
+      const mockStore = {
+        setMaxListeners: jest.fn()
+      };
+
+      lib(mockStore);
 
       expect(fakeSession).toBeCalled();
     });

@@ -296,7 +296,7 @@ describe(_startCase(filename), function () {
     });
 
     afterEach(function () {
-      fakeDb.clearMem();
+      return fakeDb.clearMem();
     });
 
     it('lists users under a domain', function (done) {
@@ -325,6 +325,57 @@ describe(_startCase(filename), function () {
         done();
       });
       fn()(req, mockRes);
+    });
+  });
+
+  describe('getRouteFromDB', function () {
+    const fn = lib[this.description];
+
+    afterEach(function (done) {
+      return fakeDb.clearMem().then(done);
+    });
+
+    it('should get users data from a uri', function (done) {
+      const req = { uri: '/_users/a' },
+        mockData = {
+          username: 'foo',
+          provider: 'bar',
+          auth: 'baz'
+        };
+
+      fakeDb.get.mockResolvedValue(mockData);
+
+      fn(req, mockRes);
+
+      expect(fakeDb.get).toBeCalledWith(req.uri);
+      done();
+    });
+  });
+
+  describe('acceptJSONOnly', function () {
+    const fn = lib[this.description],
+      req = {
+        accepts: jest.fn(),
+        get: jest.fn()
+      };
+
+    it('should block if accepts header is not set', function (done) {
+      req.accepts.mockReturnValue(false);
+
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        expect(mockRes.status).toBeCalledWith(406);
+        done();
+      });
+      fn(req, mockRes, done);
+    });
+
+    it('should not block if accepts header is set to json', function (done) {
+      req.accepts.mockReturnValue(true);
+
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        done();
+      });
+      fn(req, mockRes, done);
     });
   });
 });

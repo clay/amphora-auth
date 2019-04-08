@@ -120,7 +120,7 @@ function sendJSONErrorCode(code, message, res, extras) {
 function sendTextErrorCode(code, message, res) {
   return function () {
     res.type('text');
-    res.send(code + ' ' + message);
+    res.send(`${code} ${message}`);
   };
 }
 
@@ -209,7 +209,7 @@ function methodNotAllowed(options) {
       next();
     } else {
       code = 405;
-      message = 'Method ' + method + ' not allowed';
+      message = `Method ${method} not allowed`;
       res.set('Allow', allowed.join(', ').toUpperCase());
       sendDefaultResponseForCode(code, message, res, options);
     }
@@ -233,7 +233,7 @@ function notAcceptable(options) {
       next();
     } else {
       code = 406;
-      message = req.get('Accept') + ' not acceptable';
+      message = `${req.get('Accept')} not acceptable`;
       res.set('Accept', acceptableTypes.join(', ').toLowerCase());
       sendDefaultResponseForCode(code, message, res, options);
     }

@@ -3,7 +3,7 @@ general:
   artifacts:
     - coverage
 jobs:
-  build:
+  test:
     docker:
       # specify the version you desire here
       - image: node:8.10.0
@@ -23,3 +23,5 @@ jobs:
           key: v1-dependencies-{{ checksum "package.json" }}
       # run tests
       - run: npm test
+      # send to coveralls
+      - run: cat coverage/lcov.info | ./node_modules/coveralls/bin/coveralls.js

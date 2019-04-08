@@ -2,16 +2,14 @@
 
 const _startCase = require('lodash/startCase'),
   filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+  lib = require(`./${filename}`),
+  storage = require('../test/fixtures/mocks/storage');
 
 describe(_startCase(filename), function () {
   let fakeDb;
 
   beforeEach(function () {
-    fakeDb = {
-      get: jest.fn(),
-      put: jest.fn()
-    };
+    fakeDb = storage();
 
     lib.setDb(fakeDb);
   });
@@ -19,7 +17,7 @@ describe(_startCase(filename), function () {
   describe('get', function () {
     const fn = lib[this.description];
 
-    it('should return a value by id', function () {
+    it('calls the get method from the db service', function () {
       fakeDb.get.mockResolvedValue({ id: 'foo', username: 'Pizza', provider: 'google' });
 
       return fn('foo').then(data => {
@@ -32,7 +30,7 @@ describe(_startCase(filename), function () {
   describe('put', function () {
     const fn = lib[this.description];
 
-    it('should update an item in the db', function () {
+    it('calls the update method from the db service', function () {
       const data = {
         username: 'Pizza',
         provider: 'local',
@@ -43,6 +41,30 @@ describe(_startCase(filename), function () {
       return fn('foo', data).then(result => {
         expect(fakeDb.put).toHaveBeenCalledWith('foo', data);
         expect(result.provider).toBe('local');
+      });
+    });
+  });
+
+  describe('del', function () {
+    const fn = lib[this.description];
+
+    it('calls the delete method from the db service', function () {
+      fakeDb.del.mockResolvedValue();
+
+      return fn('foo').then(() => {
+        expect(fakeDb.del).toHaveBeenCalledWith('foo');
+      });
+    });
+  });
+
+  describe('list', function () {
+    const fn = lib[this.description];
+
+    it('calls the list method from the db service', function () {
+      fakeDb.list = jest.fn().mockResolvedValue();
+
+      return fn().then(() => {
+        expect(fakeDb.list).toHaveBeenCalledWith({});
       });
     });
   });

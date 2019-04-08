@@ -10,6 +10,7 @@ const RedisStore = require('connect-redis')(session),
 
 /**
  * Creates a new session with Redis Store.
+ * @param {Object} store
  * @returns {Object}
  */
 function createSessionStore(store = {}) {

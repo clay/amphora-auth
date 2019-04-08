@@ -28,4 +28,13 @@ describe(_startCase(filename), function () {
       expect(clayLog.init).not.toBeCalled();
     });
   });
+
+  describe('setup', function () {
+    const fn = lib[this.description];
+
+    it('should set meta properties to clay log', function () {
+      fn();
+      expect(clayLog.meta).toBeCalled();
+    });
+  });
 });
