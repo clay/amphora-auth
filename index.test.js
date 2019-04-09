@@ -148,4 +148,28 @@ describe(_startCase(filename), function () {
       expect(res.redirect).toBeCalledWith('http://domain.com/_auth/login');
     });
   });
+
+  describe('init', function () {
+    const fn = lib[this.description],
+      router = { use: jest.fn() },
+      options = {
+        router,
+        site: {
+          prefix: 'foo.com',
+          protocol: 'http',
+          port: 80
+        },
+        providers: ['apikey', 'google']
+      };
+
+    it('returns if no providers are passed in', function () {
+      expect(fn({})).toEqual([]);
+    });
+
+    it('should set required middlewares', function () {
+      fn(options);
+
+      expect(router.use).toBeCalledTimes(7);
+    });
+  });
 });

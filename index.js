@@ -203,3 +203,4 @@ module.exports.protectRoutes = protectRoutes;
 module.exports.checkAuthentication = checkAuthentication;
 module.exports.onLogin = onLogin;
 module.exports.onLogout = onLogout;
+module.exports.init = init;

@@ -67,6 +67,15 @@ describe(_startCase(filename), function () {
       fn(mockRes)(myError);
       expect(mockRes.status).toBeCalledWith(403);
     });
+
+    it('sends 400 and logs the error', function (done) {
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        expect(fakeLog).toBeCalledWith('error', 'something Client', expect.any(Object));
+        expect(mockRes.status).toBeCalledWith(400);
+        done();
+      });
+      fn(mockRes)(new Error('something Client'));
+    });
   });
 
   describe('expectJSON', function () {
@@ -93,7 +102,7 @@ describe(_startCase(filename), function () {
       res.status = jest.fn().mockReturnThis();
 
       expectResult(res, {
-        message: 'Not Found',
+        message: 'not found',
         code: 404
       }, function () {
         expect(fakeLog).not.toBeCalled();
@@ -101,7 +110,7 @@ describe(_startCase(filename), function () {
         done();
       });
       fn(function () {
-        throw Error('something not found: etc etc');
+        throw Error('not found');
       }, res);
     });
   });
@@ -376,6 +385,74 @@ describe(_startCase(filename), function () {
         done();
       });
       fn(req, mockRes, done);
+    });
+
+    it('should accept matched type', function (done) {
+      req.accepts.mockReturnValueOnce(false);
+      req.accepts.mockRejectedValueOnce(true);
+
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        done();
+      });
+      fn(req, mockRes, done);
+    });
+  });
+
+  describe('sendTextErrorCode', function () {
+    const fn = lib[this.description];
+
+    it('should send error message as text', function (done) {
+      mockRes.type = jest.fn();
+
+      expectResult(mockRes, '404 Not Found', function () {
+        expect(mockRes.type).toBeCalledWith('text');
+        done();
+      });
+      fn(404, 'Not Found', mockRes)();
+    });
+  });
+
+  describe('notFound', function () {
+    const fn = lib[this.description];
+
+    it('should send not found error message', function (done) {
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        expect(mockRes.status).toBeCalledWith(404);
+        done();
+      });
+      fn(new Error('Not Found'), mockRes);
+    });
+  });
+
+  describe('sendHTMLErrorCode', function () {
+    const fn = lib[this.description];
+
+    it('should send error message as html', function (done) {
+      mockRes.type = jest.fn();
+
+      expectResult(mockRes, '404 Not Found', function () {
+        expect(mockRes.type).toBeCalledWith('html');
+        done();
+      });
+      fn(404, 'Not Found', mockRes)();
+    });
+  });
+
+  describe('sendJSONErrorCode', function () {
+    const fn = lib[this.description];
+
+    it('should send error message as json', function (done) {
+      const error = {
+        message: 'Not Found',
+        code: 404
+      };
+
+      mockRes.json = jest.fn();
+
+      fn(error.code, error.message, mockRes, {})();
+
+      expect(mockRes.json).toBeCalledWith(error);
+      done();
     });
   });
 });

@@ -45,7 +45,7 @@ function handleError(res) {
       err.message.indexOf('ENOENT') !== -1 ||
       err.message.indexOf('not found') !== -1) {
       notFound(err, res);
-      // if the word "client" is ever in a message, it should be for the client.  We enforce that here.
+      // if the word "client" is ever in a message, it should be for the client. We enforce that here.
     } else if (err.message.indexOf('Client') !== -1) {
       clientError(err, res);
     } else {
@@ -130,11 +130,8 @@ function sendTextErrorCode(code, message, res) {
  * @param {object} res
  */
 function notFound(err, res) {
-  if (!(err instanceof Error) && err) {
-    res = err;
-  }
-
-  const message = 'Not Found',
+  console.log(err.message, err.name);
+  const message = err.message,
     code = 404;
 
   // hide error from user of api.
@@ -296,7 +293,7 @@ function acceptJSONOnly(req, res, next) {
   if (req.accepts('json')) {
     next();
   } else {
-    notAcceptable({accept: ['application/json']})(req, res);
+    notAcceptable({accept: ['application/json']})(req, res, next);
   }
 }
 
@@ -342,3 +339,7 @@ module.exports.setDb = mock => db = mock;
 module.exports.handleError = handleError;
 module.exports.clientError = clientError;
 module.exports.serverError = serverError;
+module.exports.sendTextErrorCode = sendTextErrorCode;
+module.exports.notFound = notFound;
+module.exports.sendHTMLErrorCode = sendHTMLErrorCode;
+module.exports.sendJSONErrorCode = sendJSONErrorCode;

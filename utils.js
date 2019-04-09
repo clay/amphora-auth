@@ -6,12 +6,14 @@ const _get = require('lodash/get'),
   _capitalize = require('lodash/capitalize'),
   _constant = require('lodash/constant'),
   _reject = require('lodash/reject'),
+  _last = require('lodash/last'),
   fs = require('fs'),
   path = require('path'),
   handlebars = require('handlebars'),
   references = require('./services/references'),
-  { isValidPassword } = require('./services/encrypt'),
-  db = require('./services/storage');
+  { isValidPassword } = require('./services/encrypt');
+
+let db = require('./services/storage');
 
 /**
  * encode username and provider to base64
@@ -26,24 +28,15 @@ function encode(username, provider) {
 }
 
 /**
- * Gets the base site path
- * @param {Object} site
- * @returns {string}
- */
-function getBasePath(site) {
-  return references.uriToUrl(site.prefix, site.protocol, site.port);
-}
-
-/**
  * get the proper /auth url for a site
  * note: needs to add/not add initial slash, depending on the site path
  * @param {object} site
  * @returns {string}
  */
 function getAuthUrl(site) {
-  const base = getBasePath(site);
+  const base = references.uriToUrl(site.prefix, site.protocol, site.port);
 
-  return `${base}_auth`;
+  return _last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
 }
 
 /**
@@ -53,7 +46,7 @@ function getAuthUrl(site) {
  * @returns {string}
  */
 function getPathOrBase(site) {
-  return site.path || getBasePath(site) || '/';
+  return site.path || '/';
 }
 
 /**
@@ -132,7 +125,7 @@ function verify(properties) {
  * @returns {string}
  */
 function removePrefix(str, prefixToken) {
-  const index =  str.indexOf(prefixToken);
+  const index = str.indexOf(prefixToken);
 
   if (index > -1) {
     str = str.substring(index + prefixToken.length).trim();
@@ -141,13 +134,23 @@ function removePrefix(str, prefixToken) {
   return str;
 }
 
-// serialize and deserialize users into the session
-// note: pull user data from the database,
-// so requests in the same session will get updated user data
+/**
+ * Serialize user into the session
+ * Note: pull user data from the database,
+ * so requests in the same session will get updated user data
+ * @param {Object} user
+ * @param {Function} done
+ */
 function serializeUser(user, done) {
   done(null, encode(user.username.toLowerCase(), user.provider));
 }
 
+/**
+ * Deserialize user from session.
+ * @param {string} uid
+ * @param {Function} done
+ * @returns {Promise<void>}
+ */
 function deserializeUser(uid, done) {
   return db.get(`/_users/${uid}`)
     .then(user => done(null, user))
@@ -197,7 +200,7 @@ function compileTemplate(filename) {
  * @returns {string}
  */
 function getUri(req) {
-  return normalizePath(req.hostname + req.baseUrl + req.path);
+  return normalizePath(`${req.hostname}${req.baseUrl}${req.path}`);
 }
 
 /**
@@ -248,3 +251,8 @@ module.exports.getProviders = getProviders;
 module.exports.generateStrategyName = generateStrategyName;
 module.exports.compileTemplate = compileTemplate;
 module.exports.getUri = getUri;
+
+// For testing purposes
+module.exports.setDb = mock => db = mock;
+module.exports.removeQueryString = removeQueryString;
+module.exports.removeExtension = removeExtension;
