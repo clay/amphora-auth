@@ -74,7 +74,7 @@ function verify(properties) {
       provider = properties.provider;
 
     if (!username) {
-      throw new Error('Provider hasn\'t given a username at ' + properties.username);
+      throw new Error(`Provider hasn't given a username at ${properties.username}`);
     }
 
     // get UID

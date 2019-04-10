@@ -162,7 +162,7 @@ describe(_startCase(filename), function () {
     it('adds vary without extension', function (done) {
       const req = {
           path: '/hey',
-          baseUrl: '',
+          baseUrl: '/foo',
           url: ''
         },
         res = createMockRes();
@@ -179,7 +179,7 @@ describe(_startCase(filename), function () {
     it('does not add vary with extension', function (done) {
       const req = {
           path: '/hey.html',
-          baseUrl: '',
+          baseUrl: '/foo',
           url: ''
         },
         res = createMockRes();
@@ -188,7 +188,7 @@ describe(_startCase(filename), function () {
 
       fn({ varyBy: ['whatever'] })(req, res, function () {
         expect(fakeLog).not.toBeCalled();
-        expect(res.set).toBeCalledWith('Vary', 'whatever');
+        expect(res.set).not.toBeCalledWith('Vary', 'whatever');
         done();
       });
     });

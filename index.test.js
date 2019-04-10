@@ -4,7 +4,8 @@ const _startCase = require('lodash/startCase'),
   _noop = require('lodash/noop'),
   passport = require('passport'),
   filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+  lib = require(`./${filename}`),
+  strategyService = require('./strategies');
 
 describe(_startCase(filename), function () {
   describe('isProtectedRoute', function () {
@@ -150,8 +151,7 @@ describe(_startCase(filename), function () {
   });
 
   describe('init', function () {
-    const fn = lib[this.description],
-      router = { use: jest.fn() },
+    const router = { use: jest.fn(), get: jest.fn() },
       options = {
         router,
         site: {
@@ -163,13 +163,39 @@ describe(_startCase(filename), function () {
       };
 
     it('returns if no providers are passed in', function () {
-      expect(fn({})).toEqual([]);
+      expect(lib({})).toEqual([]);
     });
 
     it('should set required middlewares', function () {
-      fn(options);
+      strategyService.createStrategy = jest.fn();
+      strategyService.addAuthRoutes = jest.fn();
+
+      lib(options);
 
       expect(router.use).toBeCalledTimes(7);
+    });
+
+    it('should add authorization routes', function () {
+      lib(options);
+
+      expect(router.get).toBeCalledTimes(2);
+      expect(router.get).toBeCalledWith('/_auth/login', expect.any(Function));
+      expect(router.get).toBeCalledWith('/_auth/logout', expect.any(Function));
+    });
+  });
+
+  describe('addUser', function () {
+    const fn = lib[this.description];
+
+    it('should add user data to the response', function () {
+      const next = jest.fn(),
+        res = { locals: { user: {} } },
+        req = { user: { username: 'foo', provider: 'bar' } };
+
+      fn(req, res, next);
+
+      expect(res.locals.user).toEqual(req.user);
+      expect(next).toBeCalled();
     });
   });
 });

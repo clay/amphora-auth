@@ -130,7 +130,6 @@ function sendTextErrorCode(code, message, res) {
  * @param {object} res
  */
 function notFound(err, res) {
-  console.log(err.message, err.name);
   const message = err.message,
     code = 404;
 
@@ -181,7 +180,7 @@ function varyWithoutExtension(options) {
   return function (req, res, next) {
     // a slash, followed by a dot, followed by more characters, means it is an extension
     // note that this is explicitly not talking about a uri; Law of Demeter
-    if (!(req.baseUrl + req.url).match(/.*\/.*\.(.*)/)) {
+    if (!(req.baseUrl + req.path).match(/.*\/.*\.(.*)/)) {
       res.set('Vary', varyBy);
     }
 

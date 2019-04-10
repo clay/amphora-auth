@@ -2,6 +2,7 @@
 
 const _startCase = require('lodash/startCase'),
   handlebars = require('handlebars'),
+  bcrypt = require('bcrypt'),
   filename = __filename.split('/').pop().split('.').shift(),
   lib = require(`./${filename}`),
   storage = require('./test/fixtures/mocks/storage');
@@ -173,6 +174,10 @@ describe(_startCase(filename), function () {
     it('returns the same path url if there are no extensions', function () {
       expect(fn('http://nymag.com/_pages/homepage')).toEqual('http://nymag.com/_pages/homepage');
     });
+
+    it('removes the extension if it does not have a leading slash', function () {
+      expect(fn('homepage.html')).toEqual('homepage');
+    });
   });
 
   describe('getUri', function () {
@@ -209,6 +214,130 @@ describe(_startCase(filename), function () {
 
       expect(results.length).toEqual(1);
       expect(results[0].url).toEqual(expected[0].url);
+    });
+  });
+
+  describe('verify', function () {
+    const fn = lib[this.description];
+
+    it('throws if there is no username field', function () {
+      const properties = { username: 'username' },
+        profile = { username: '' },
+        next = jest.fn(),
+        cb = () => fn(properties)({}, '', '', profile, next);
+
+      expect(cb).toThrowError('Provider hasn\'t given a username at username');
+    });
+
+    it('should exit if the user data is not found', function () {
+      const properties = { username: 'username', provider: 'google' },
+        profile = { username: 'foo' },
+        req = {},
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockRejectedValue();
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, false, { message: 'User not found!' });
+        });
+    });
+
+    it('should exit if there was an error updating the user', function () {
+      const properties = { username: 'username', provider: 'google' },
+        profile = { username: 'foo' },
+        req = {},
+        mockError = new Error('Something went wrong'),
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      fakeDb.put = jest.fn().mockRejectedValue(mockError);
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(mockError);
+        });
+    });
+
+    it('should return user data after updating', function () {
+      const properties = { username: 'username', provider: 'google' },
+        profile = { username: 'foo' },
+        req = {},
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      fakeDb.put = jest.fn().mockResolvedValue();
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, mockUser);
+        });
+    });
+
+    it('should exit if the password does not match', function () {
+      const properties = { username: 'username', provider: 'google', password: 'password' },
+        profile = { username: 'foo', password: 'secret' },
+        req = {},
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      fakeDb.put = jest.fn().mockResolvedValue();
+      bcrypt.compareSync = jest.fn().mockReturnValue(false);
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, false, { message: 'Invalid Password' });
+        });
+    });
+
+    it('should exit if password does not match and user is already authenticated', function () {
+      const properties = { username: 'username', provider: 'google', password: 'password' },
+        profile = { username: 'foo', password: 'secret' },
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
+        req = { user: mockUser },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      bcrypt.compareSync = jest.fn().mockReturnValue(false);
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, false, { message: 'Invalid Password' });
+        });
+    });
+
+    it('should return data if user is already authenticated', function () {
+      const properties = { username: 'username', provider: 'google', password: 'password' },
+        profile = { username: 'foo', password: 'secret' },
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
+        req = { user: mockUser },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      bcrypt.compareSync = jest.fn().mockReturnValue(true);
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, mockUser);
+        });
+    });
+
+    it('should exit if user is already authenticated but data cannot be found', function () {
+      const properties = { username: 'username', provider: 'google' },
+        profile = { username: 'foo' },
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
+        req = { user: mockUser },
+        next = jest.fn();
+
+      fakeDb.get = jest.fn().mockRejectedValue();
+
+      return fn(properties)(req, '', '', profile, next)
+        .then(() => {
+          expect(next).toBeCalledWith(null, false, { message: 'User not found!' });
+        });
     });
   });
 });

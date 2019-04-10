@@ -12,7 +12,7 @@ const _isEmpty = require('lodash/isEmpty'),
     getProviders
   } = require('./utils'),
   createSessionStore = require('./services/session-store'),
-  { addAuthRoutes, createStrategy } = require('./strategies'),
+  strategyService = require('./strategies'),
   { AUTH_LEVELS } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
   { setDb } = require('./services/storage'),
@@ -165,7 +165,7 @@ function init({ router, providers, store, site, storage, bus }) {
 
   const currentProviders = getProviders(providers, site);
 
-  createStrategy(providers, site); // allow mocking this in tests
+  strategyService.createStrategy(providers, site); // allow mocking this in tests
 
   // init session authentication
   router.use(createSessionStore(store));
@@ -181,7 +181,7 @@ function init({ router, providers, store, site, storage, bus }) {
   // rather than as route controllers in lib/routes/
   router.get('/_auth/login', onLogin(site, currentProviders));
   router.get('/_auth/logout', onLogout(site));
-  addAuthRoutes(providers, router, site); // allow mocking this in tests
+  strategyService.addAuthRoutes(providers, router, site); // allow mocking this in tests
 
   // handle de-authentication errors. This occurs when a user is logged in
   // and someone removes them as a user. We need to catch the error
@@ -203,4 +203,4 @@ module.exports.protectRoutes = protectRoutes;
 module.exports.checkAuthentication = checkAuthentication;
 module.exports.onLogin = onLogin;
 module.exports.onLogout = onLogout;
-module.exports.init = init;
+module.exports.addUser = addUser;
