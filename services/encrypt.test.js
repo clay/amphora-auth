@@ -1,7 +1,7 @@
 'use strict';
 
 const _startCase = require('lodash/startCase'),
-  bcrypt = require('bcrypt'),
+  bcrypt = require('bcryptjs'),
   filename = __filename.split('/').pop().split('.').shift(),
   lib = require(`./${filename}`);
 

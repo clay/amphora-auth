@@ -2,7 +2,7 @@
 
 const _startCase = require('lodash/startCase'),
   handlebars = require('handlebars'),
-  bcrypt = require('bcrypt'),
+  bcrypt = require('bcryptjs'),
   filename = __filename.split('/').pop().split('.').shift(),
   lib = require(`./${filename}`),
   storage = require('./test/fixtures/mocks/storage');
