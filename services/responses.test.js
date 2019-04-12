@@ -340,8 +340,8 @@ describe(_startCase(filename), function () {
   describe('getRouteFromDB', function () {
     const fn = lib[this.description];
 
-    afterEach(function (done) {
-      return fakeDb.clearMem().then(done);
+    afterEach(function () {
+      return fakeDb.clearMem();
     });
 
     it('should get users data from a uri', function (done) {
@@ -421,6 +421,14 @@ describe(_startCase(filename), function () {
         done();
       });
       fn(new Error('Not Found'), mockRes);
+    });
+
+    it('should send not found even if there is no error message', function (done) {
+      expectResult(mockRes, 'sendStatus: whatever', function () {
+        expect(mockRes.status).toBeCalledWith(404);
+        done();
+      });
+      fn(new Error(), mockRes);
     });
   });
 

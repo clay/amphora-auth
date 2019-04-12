@@ -219,22 +219,25 @@ describe(_startCase(filename), function () {
 
   describe('verify', function () {
     const fn = lib[this.description];
+    let properties, profile, req, next;
+
+    beforeEach(function () {
+      properties = { username: 'username', provider: 'google' };
+      profile = { username: 'foo' };
+      req = {};
+      next = jest.fn();
+    });
 
     it('throws if there is no username field', function () {
-      const properties = { username: 'username' },
-        profile = { username: '' },
-        next = jest.fn(),
-        cb = () => fn(properties)({}, '', '', profile, next);
+      properties = { username: 'username' };
+      profile = { username: '' };
+
+      const cb = () => fn(properties)({}, '', '', profile, next);
 
       expect(cb).toThrowError('Provider hasn\'t given a username at username');
     });
 
     it('should exit if the user data is not found', function () {
-      const properties = { username: 'username', provider: 'google' },
-        profile = { username: 'foo' },
-        req = {},
-        next = jest.fn();
-
       fakeDb.get = jest.fn().mockRejectedValue();
 
       return fn(properties)(req, '', '', profile, next)
@@ -244,12 +247,8 @@ describe(_startCase(filename), function () {
     });
 
     it('should exit if there was an error updating the user', function () {
-      const properties = { username: 'username', provider: 'google' },
-        profile = { username: 'foo' },
-        req = {},
-        mockError = new Error('Something went wrong'),
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
-        next = jest.fn();
+      const mockError = new Error('Something went wrong'),
+        mockUser = { username: 'foo', provider: 'google', auth: 'admin' };
 
       fakeDb.get = jest.fn().mockResolvedValue(mockUser);
       fakeDb.put = jest.fn().mockRejectedValue(mockError);
@@ -261,11 +260,7 @@ describe(_startCase(filename), function () {
     });
 
     it('should return user data after updating', function () {
-      const properties = { username: 'username', provider: 'google' },
-        profile = { username: 'foo' },
-        req = {},
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
-        next = jest.fn();
+      const mockUser = { username: 'foo', provider: 'google', auth: 'admin' };
 
       fakeDb.get = jest.fn().mockResolvedValue(mockUser);
       fakeDb.put = jest.fn().mockResolvedValue();
@@ -277,12 +272,10 @@ describe(_startCase(filename), function () {
     });
 
     it('should exit if the password does not match', function () {
-      const properties = { username: 'username', provider: 'google', password: 'password' },
-        profile = { username: 'foo', password: 'secret' },
-        req = {},
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
-        next = jest.fn();
+      const mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' };
 
+      properties = { username: 'username', provider: 'google', password: 'password' };
+      profile = { username: 'foo', password: 'secret' };
       fakeDb.get = jest.fn().mockResolvedValue(mockUser);
       fakeDb.put = jest.fn().mockResolvedValue();
       bcrypt.compareSync = jest.fn().mockReturnValue(false);
@@ -294,12 +287,11 @@ describe(_startCase(filename), function () {
     });
 
     it('should exit if password does not match and user is already authenticated', function () {
-      const properties = { username: 'username', provider: 'google', password: 'password' },
-        profile = { username: 'foo', password: 'secret' },
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
-        req = { user: mockUser },
-        next = jest.fn();
+      const mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' };
 
+      properties = { username: 'username', provider: 'google', password: 'password' };
+      profile = { username: 'foo', password: 'secret' };
+      req = { user: mockUser };
       fakeDb.get = jest.fn().mockResolvedValue(mockUser);
       bcrypt.compareSync = jest.fn().mockReturnValue(false);
 
@@ -310,12 +302,11 @@ describe(_startCase(filename), function () {
     });
 
     it('should return data if user is already authenticated', function () {
-      const properties = { username: 'username', provider: 'google', password: 'password' },
-        profile = { username: 'foo', password: 'secret' },
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' },
-        req = { user: mockUser },
-        next = jest.fn();
+      const mockUser = { username: 'foo', provider: 'google', auth: 'admin', password: 'secret123foo' };
 
+      properties = { username: 'username', provider: 'google', password: 'password' };
+      profile = { username: 'foo', password: 'secret' };
+      req = { user: mockUser };
       fakeDb.get = jest.fn().mockResolvedValue(mockUser);
       bcrypt.compareSync = jest.fn().mockReturnValue(true);
 
@@ -326,12 +317,9 @@ describe(_startCase(filename), function () {
     });
 
     it('should exit if user is already authenticated but data cannot be found', function () {
-      const properties = { username: 'username', provider: 'google' },
-        profile = { username: 'foo' },
-        mockUser = { username: 'foo', provider: 'google', auth: 'admin' },
-        req = { user: mockUser },
-        next = jest.fn();
+      const mockUser = { username: 'foo', provider: 'google', auth: 'admin' };
 
+      req = { user: mockUser };
       fakeDb.get = jest.fn().mockRejectedValue();
 
       return fn(properties)(req, '', '', profile, next)

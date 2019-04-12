@@ -130,7 +130,7 @@ function sendTextErrorCode(code, message, res) {
  * @param {object} res
  */
 function notFound(err, res) {
-  const message = err.message,
+  const message = err.message || 'Not Found',
     code = 404;
 
   // hide error from user of api.

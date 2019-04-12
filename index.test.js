@@ -172,6 +172,7 @@ describe(_startCase(filename), function () {
 
       lib(options);
 
+      // Should call router use 7 times to set the required middlewares
       expect(router.use).toBeCalledTimes(7);
     });
 
