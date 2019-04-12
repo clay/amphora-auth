@@ -5,7 +5,7 @@ workflow "Lint and Test" {
 
 action "Install" {
   uses = "actions/npm@master"
-  args = "install --ignore-scripts --only=dev"
+  args = "install"
 }
 
 action "Test" {
