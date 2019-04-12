@@ -18,4 +18,6 @@ action "Coveralls" {
   needs = "Test"
   uses = "actions/npm@master"
   args = "run coveralls"
+  secrets = [ "COVERALLS_REPO_TOKEN" ]
+  env = { COVERALLS_SERVICE_NAME = "GitHub Actions" }
 }
