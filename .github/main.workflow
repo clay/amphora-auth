@@ -1,23 +1,11 @@
 workflow "Lint and Test" {
   on = "push"
-  resolves = [ "Coveralls" ]
-}
-
-action "Install" {
-  uses = "actions/npm@master"
-  args = "install"
+  resolves = [ "Test" ]
 }
 
 action "Test" {
-  needs = "Install"
   uses = "actions/npm@master"
   args = "test"
-}
-
-action "Coveralls" {
-  needs = "Test"
-  uses = "actions/npm@master"
-  args = "run coveralls"
   secrets = [ "COVERALLS_REPO_TOKEN" ]
   env = { COVERALLS_SERVICE_NAME = "GitHub Actions" }
 }
