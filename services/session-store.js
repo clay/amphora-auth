@@ -34,7 +34,7 @@ function createSessionStore(store = {}) {
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
     },
-    redisStore,
+    store: redisStore,
   });
 }
 
