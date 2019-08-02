@@ -16,7 +16,7 @@ const _isEmpty = require('lodash/isEmpty'),
   { AUTH_LEVELS } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
   { setDb } = require('./services/storage'),
-  { setBus } = require('./controllers/users');
+  { setBus } = require('./services/bus');
 
 /**
  * determine if a route is protected

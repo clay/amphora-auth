@@ -3,7 +3,7 @@
 const { encode } = require('../utils'),
   encrypt = require('../services/encrypt');
 let db = require('../services/storage'),
-  bus;
+  bus = require('../services/bus');
 
 /**
  * Adds an user into the db and publishes the action to the bus

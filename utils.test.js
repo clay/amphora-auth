@@ -8,12 +8,16 @@ const _startCase = require('lodash/startCase'),
   storage = require('./test/fixtures/mocks/storage');
 
 describe(_startCase(filename), function () {
-  let fakeDb;
+  let fakeDb, fakeBus;
 
   beforeEach(function () {
     fakeDb = storage();
+    fakeBus = {
+      publish: jest.fn()
+    };
 
     lib.setDb(fakeDb);
+    lib.setBus(fakeBus);
   });
 
   describe('compileTemplate', function () {
