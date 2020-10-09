@@ -50,4 +50,18 @@ describe(_startCase(filename), function () {
       expect(result).toBeFalsy();
     });
   });
+
+  describe('isValidAPIKey', function () {
+    const fn = lib[this.description];
+
+    it('should return true if valid apikey', function () {
+      bcrypt.compareSync = jest.fn().mockReturnValue(true);
+      expect(fn('foobar', { apikey: 'foo123bar456' })).toEqual(true);
+    });
+
+    it('should return false if invalid password', function () {
+      bcrypt.compareSync = jest.fn().mockReturnValue(false);
+      expect(fn('foobar', { apikey: 'foo123bar456' })).toEqual(false);
+    });
+  });
 });

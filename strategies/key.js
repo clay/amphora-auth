@@ -2,7 +2,7 @@
 
 const passport = require('passport'),
   APIKeyStrategy = require('passport-http-header-token').Strategy,
-  { getAuthUrl, getPathOrBase, generateStrategyName } = require('../utils');
+  { fetchUserViaAPIKey, getAuthUrl, getPathOrBase, generateStrategyName } = require('../utils');
 
 /**
  * api key callback, checks to see if api key provided matches env variable
@@ -10,12 +10,18 @@ const passport = require('passport'),
  * @param {function} done
  */
 function apiCallback(apikey, done) {
-  if (apikey === process.env.CLAY_ACCESS_KEY) {
+  if (process.env.CLAY_ACCESS_KEY && apikey === process.env.CLAY_ACCESS_KEY) {
     // If we're using an API Key then we're assuming the user is
     // has admin privileges by defining the auth level in the next line
     done(null, { provider: 'apikey', auth: 'admin' });
   } else {
-    done(null, false, { message: 'Unknown apikey: ' + apikey });
+    fetchUserViaAPIKey(apikey).then((user) => {
+      if (user) {
+        done(null, { provider: 'apikey', auth: user.auth });
+      } else {
+        done(null, false, { message: 'Unknown apikey: ' + apikey });
+      }
+    })
   }
 }
 

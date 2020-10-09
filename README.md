@@ -83,6 +83,18 @@ export LDAP_SEARCH_BASE=<LDAP_SEARCH_BASE>
 export LDAP_SEARCH_FILTER=<LDAP_SEARCH_FILTER>
 ```
 
+Additionally, the following environment variable can toggle the global access key.
+
+If **not set** or **set to an empty string** only user-level access keys will be accepted.
+
+If **set to a string** the value will act as a global plain-text key.
+
+:warning: This setting is insecure and should only be used when bootstrapping a new environment.
+
+```
+CLAY_ACCESS_KEY=
+```
+
 ## License
 
 MIT

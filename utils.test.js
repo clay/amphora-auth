@@ -71,6 +71,25 @@ describe(_startCase(filename), function () {
     });
   });
 
+  describe('generateAPIKey', function () {
+    const fn = lib[this.description];
+
+    it('throws an error if username not provided', function () {
+      expect(() => fn()).toThrow();
+    });
+
+    it('throws an error if provider not provided', function () {
+      expect(() => fn('test@example.com')).toThrow();
+    });
+
+    it('returns a key with a base64-encoded portion and 31-char secret', function () {
+      const { apikey } = fn('test@example.com', 'ldap');
+
+      expect(apikey.split(':')[0]).toEqual('dGVzdEBleGFtcGxlLmNvbUBsZGFw');
+      expect(apikey.split(':')[1].length).toEqual(31);
+    });
+  });
+
   describe('getPathOrBase', function () {
     const fn = lib[this.description];
 
@@ -328,4 +347,39 @@ describe(_startCase(filename), function () {
         });
     });
   });
+
+  describe('fetchUserViaAPIKey', function () {
+    const fn = lib[this.description];
+
+    it('should return null if apikey is not provided', function () {
+      expect(fn()).resolves.toEqual(null);
+    });
+
+    it('should return null if apikey is in an invalid format', function () {
+      expect(fn('key-missing-colon')).resolves.toEqual(null);
+    });
+
+    it('should return null if user is not found', function () {
+      fakeDb.get = jest.fn().mockRejectedValue();
+
+      expect(fn('dGVzdEBleGFtcGxlLmNvbUBsZGFw:secret')).resolves.toEqual(null);
+    });
+
+    it('should return null if user is found but key does not match', function () {
+      fakeDb.get = jest.fn().mockResolvedValue({ apikey: 'bcrypted-value' });
+      bcrypt.compareSync = jest.fn().mockReturnValue(false);
+
+      expect(fn('dGVzdEBleGFtcGxlLmNvbUBsZGFw:secret')).resolves.toEqual(null);
+    });
+
+    it('should return user object if valid api key is provided', function () {
+      const mockUser = { apikey: 'bcrypted-value' };
+
+      fakeDb.get = jest.fn().mockResolvedValue(mockUser);
+      bcrypt.compareSync = jest.fn().mockReturnValue(true);
+
+      expect(fn('dGVzdEBleGFtcGxlLmNvbUBsZGFw:secret')).resolves.toEqual(mockUser);
+    });
+  });
+
 });

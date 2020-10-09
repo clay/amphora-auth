@@ -21,5 +21,16 @@ function isValidPassword(user, password) {
   return bcrypt.compareSync(password, user.password);
 }
 
+/**
+ * Verifies whether the encrypted apikey is valid or not
+ * @param {Object} user
+ * @param {string} apikey
+ * @returns {boolean}
+ */
+function isValidAPIKey(user, apikey) {
+  return bcrypt.compareSync(apikey, user.apikey);
+}
+
 module.exports.hashPassword = hashPassword;
 module.exports.isValidPassword = isValidPassword;
+module.exports.isValidAPIKey = isValidAPIKey;

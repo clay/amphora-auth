@@ -27,7 +27,8 @@
     "passport-local": "^1.0.0",
     "passport-slack": "0.0.7",
     "passport-twitter": "^1.0.4",
-    "through2-map": "^3.0.0"
+    "through2-map": "^3.0.0",
+    "uuid-apikey": "^1.4.6"
   },
   "devDependencies": {
     "coveralls": "^3.0.3",

@@ -7,11 +7,13 @@ const _get = require('lodash/get'),
   _constant = require('lodash/constant'),
   _reject = require('lodash/reject'),
   _last = require('lodash/last'),
+  bluebird = require('bluebird'),
   fs = require('fs'),
   path = require('path'),
   handlebars = require('handlebars'),
   references = require('./services/references'),
-  { isValidPassword } = require('./services/encrypt');
+  uuidAPIKey = require('uuid-apikey'),
+  { hashPassword, isValidAPIKey, isValidPassword } = require('./services/encrypt');
 
 let db = require('./services/storage');
 
@@ -25,6 +27,25 @@ function encode(username, provider) {
   const buf = Buffer.from(`${username}@${provider}`, 'utf8');
 
   return buf.toString('base64');
+}
+
+/**
+ * Generates an API key.
+ * @param {string} username
+ * @param {string} provider
+ * @returns {Object} An object in the format { hash: string, apikey: string }.
+ */
+function generateAPIKey(username, provider) {
+  if (!username) {
+    throw new Error(`Invalid username ${username} provided for API Key`);
+  } else if (!provider) {
+    throw new Error(`Invalid provider ${provider} provided for API Key`);
+  }
+  const uid = encode(username, provider),
+    apikey = `${uid}:${uuidAPIKey.create().apiKey}`,
+    hash = hashPassword(apikey);
+
+  return { apikey, hash };
 }
 
 /**
@@ -115,6 +136,28 @@ function verify(properties) {
         .catch(() => done(null, false, { message: 'User not found!' })); // no user found
     }
   };
+}
+
+/**
+ * Verifies that an API key matches a user-assigned API key.
+ *
+ * @param {string} apikey
+ * @returns {Object?} The user object if valid, else null.
+ */
+function fetchUserViaAPIKey(apikey) {
+  if (!apikey || apikey.indexOf(':') === -1) {
+    return bluebird.resolve(null);
+  }
+
+  const uid = `/_users/${apikey.split(':')[0]}`;
+
+  return db.get(uid)
+    .then(data => {
+      if (isValidAPIKey(data, apikey)) {
+        return data;
+      }
+      return null;
+    });
 }
 
 /**
@@ -240,6 +283,7 @@ function removeQueryString(path) {
 }
 
 module.exports.encode = encode;
+module.exports.fetchUserViaAPIKey = fetchUserViaAPIKey;
 module.exports.getPathOrBase = getPathOrBase;
 module.exports.getAuthUrl = getAuthUrl;
 module.exports.getCallbackUrl = getCallbackUrl;
@@ -248,6 +292,7 @@ module.exports.removePrefix = removePrefix;
 module.exports.serializeUser = serializeUser;
 module.exports.deserializeUser = deserializeUser;
 module.exports.getProviders = getProviders;
+module.exports.generateAPIKey = generateAPIKey;
 module.exports.generateStrategyName = generateStrategyName;
 module.exports.compileTemplate = compileTemplate;
 module.exports.getUri = getUri;

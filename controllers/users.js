@@ -1,6 +1,6 @@
 'use strict';
 
-const { encode } = require('../utils'),
+const { encode, generateAPIKey } = require('../utils'),
   encrypt = require('../services/encrypt');
 let db = require('../services/storage'),
   bus;
@@ -11,8 +11,8 @@ let db = require('../services/storage'),
  * @returns {Promise}
  */
 function createUser(data = {}) {
-  const { username, password, provider, auth } = data;
-  let uri = '/_users/';
+  const { username, password, provider, auth, apikey } = data;
+  let uri = '/_users/', key = { apikey: null, hash: null };
 
   // Validate payload
   if (!username || !provider || !auth) {
@@ -23,6 +23,12 @@ function createUser(data = {}) {
     data.password = encrypt.hashPassword(password);
   }
 
+  if (apikey === true) {
+    key = generateAPIKey(username, provider);
+  }
+
+  data.apikey = key.hash;
+
   // Add the encoded username and provider to the end of the uri
   uri += encode(username.toLowerCase(), provider);
 
@@ -31,7 +37,7 @@ function createUser(data = {}) {
     data._ref = uri;
 
     bus.publish('saveUser', { key: uri, value: data });
-    return data;
+    return { ...data, apikey: key.apikey };
   });
 }
 
