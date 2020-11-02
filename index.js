@@ -18,6 +18,8 @@ const _isEmpty = require('lodash/isEmpty'),
   { setDb } = require('./services/storage'),
   { setBus } = require('./controllers/users');
 
+let authMiddlewares = [];
+
 /**
  * determine if a route is protected
  * protected routes are ?edit=true and any method other than GET or HEAD
@@ -169,7 +171,9 @@ function init({ router, providers, store, site, storage, bus }) {
   setDb(storage);
   setBus(bus);
 
-  const currentProviders = getProviders(providers, site);
+  const currentProviders = getProviders(providers, site),
+    protectRoutesMiddleware = protectRoutes(site),
+    checkAuthenticationMiddleware = checkAuthentication(site);
 
   strategyService.createStrategy(providers, site); // allow mocking this in tests
 
@@ -179,25 +183,35 @@ function init({ router, providers, store, site, storage, bus }) {
   router.use(passport.session());
   router.use(flash());
 
-  // protect routes
-  router.use(protectRoutes(site));
+  authMiddlewares = [
+    // handle de-authentication errors. This occurs when a user is logged in
+    // and someone removes them as a user. We need to catch the error
+    protectRoutesMiddleware,
+    checkAuthenticationMiddleware,
+    addUser
+  ];
 
   // add authorization routes
   // note: these (and the provider routes) are added here,
   // rather than as route controllers in lib/routes/
-  router.get('/_auth/login', onLogin(site, currentProviders));
-  router.get('/_auth/logout', onLogout(site));
+  router.get('/_auth/login', protectRoutesMiddleware, onLogin(site, currentProviders), checkAuthenticationMiddleware, addUser);
+  router.get('/_auth/logout', protectRoutesMiddleware, onLogout(site), checkAuthenticationMiddleware, addUser);
   strategyService.addAuthRoutes(providers, router, site); // allow mocking this in tests
-
-  // handle de-authentication errors. This occurs when a user is logged in
-  // and someone removes them as a user. We need to catch the error
-  router.use(checkAuthentication(site));
-  router.use(addUser);
 
   return currentProviders; // for testing/verification
 }
 
+/**
+ * Adds authentication middlewares to the router
+ *
+ * @param {Object} router
+ */
+function useAuth(router) {
+  authMiddlewares.forEach(middleware => router.use(middleware));
+}
+
 module.exports = init;
+module.exports.useAuth = useAuth;
 module.exports.withAuthLevel = withAuthLevel;
 module.exports.authLevels = AUTH_LEVELS;
 module.exports.addRoutes = require('./routes/_users');
