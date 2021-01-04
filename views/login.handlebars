@@ -193,13 +193,14 @@
                 </a>
             {{/each}}
           </div>
-          <p class="separator">or</p>
         {{/if}}
+        {{#if useLocalAuth}}
         <form class="login-form" action="{{localAuthPath}}" method="post">
           <input id="username" name="username" type="text" placeholder="Username" />
           <input id="password" name="password" type="password" placeholder="Password" />
           <button type="submit">Login</button>
         </form>
+        {{/if}}
       {{/if}}
     </div>
   </div>

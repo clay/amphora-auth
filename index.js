@@ -73,12 +73,13 @@ function protectRoutes(site) {
 /**
  * middleware to show login page
  * @param {object} site
- * @param {array} currentProviders
+ * @param {array} providers
  * @returns {function}
  */
-function onLogin(site, currentProviders) {
+function onLogin(site, providers) {
   return function (req, res) {
     const template = compileLoginPage(),
+      currentProviders = getProviders(providers, site),
       authUrl = getAuthUrl(site),
       flash = req.flash();
 
@@ -102,7 +103,8 @@ function onLogin(site, currentProviders) {
         currentProviders: currentProviders,
         user: req.user,
         logoutLink: `${authUrl}/logout`,
-        localAuthPath: `${authUrl}/local`
+        localAuthPath: `${authUrl}/local`,
+        useLocalAuth: providers.includes('local')
       }));
     }
   };
@@ -185,7 +187,7 @@ function init({ router, providers, store, site, storage, bus }) {
   // add authorization routes
   // note: these (and the provider routes) are added here,
   // rather than as route controllers in lib/routes/
-  router.get('/_auth/login', onLogin(site, currentProviders));
+  router.get('/_auth/login', onLogin(site, providers));
   router.get('/_auth/logout', onLogout(site));
   strategyService.addAuthRoutes(providers, router, site); // allow mocking this in tests
 
