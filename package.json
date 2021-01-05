@@ -6,7 +6,8 @@
   "scripts": {
     "lint": "eslint --max-warnings 0 *.js",
     "test": "npm run lint && jest",
-    "coveralls": "cat ./coverage/lcov.info | coveralls"
+    "coveralls": "cat ./coverage/lcov.info | coveralls",
+    "release": "./.circleci/scripts/release.sh"
   },
   "author": "",
   "license": "MIT",
