@@ -2,6 +2,7 @@
 
 const STRATEGIES = {
   apikey: require('./key'),
+  adoidc: require('./active-directory-oidc'),
   cognito: require('./cognito'),
   google: require('./google'),
   ldap: require('./ldap'),

@@ -33,6 +33,7 @@ This module provides local authentication in Clay with a username and password a
 - Slack
 - Cognito
 - LDAP
+- Azure Active Directory OIDC
 
 To get started editing in Clay, create a user account. The easiest way to do this is to create a `user.yml` file that looks like this:
 
@@ -81,6 +82,13 @@ export LDAP_BIND_DN=<LDAP_BIND_DN>
 export LDAP_BIND_CREDENTIALS=<LDAP_BIND_CREDENTIALS>
 export LDAP_SEARCH_BASE=<LDAP_SEARCH_BASE>
 export LDAP_SEARCH_FILTER=<LDAP_SEARCH_FILTER>
+
+export AD_OIDC_IDENTITY_METADATA=<AD_OIDC_IDENTITY_METADATA>
+export AD_OIDC_CLIENT_ID=<AD_OIDC_CONSUMER_CLIENT>
+export AD_OIDC_RESPONSE_MODE=<AD_OIDC_RESPONSE_MODE>
+export AD_OIDC_REDIRECT_URL=<AD_OIDC_REDIRECT_URL>
+export AD_OIDC_ALLOW_HTTP=<true or false>
+export AD_OIDC_SCOPE=<AD_OIDC_SCOPE>
 ```
 
 ## License
