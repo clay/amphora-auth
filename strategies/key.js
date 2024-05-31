@@ -10,7 +10,8 @@ const passport = require('passport'),
  * @param {function} done
  */
 function apiCallback(apikey, done) {
-  if (apikey === process.env.CLAY_ACCESS_KEY) {
+  if (apikey === process.env.CLAY_ACCESS_KEY ||
+      apikey === process.env.PREVIOUS_CLAY_ACCESS_KEY) {
     // If we're using an API Key then we're assuming the user is
     // has admin privileges by defining the auth level in the next line
     done(null, { provider: 'apikey', auth: 'admin' });
