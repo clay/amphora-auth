@@ -163,7 +163,7 @@ function addUser(req, res, next) {
  * @param {object} params.storage
  * @returns {object[]}
  */
-function init({ router, providers, store, site, storage, bus }) {
+function init({ router, providers, store, site, storage, bus, preventAuth }) {
   if (_isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
@@ -190,6 +190,8 @@ function init({ router, providers, store, site, storage, bus }) {
   router.get('/_auth/login', onLogin(site, providers));
   router.get('/_auth/logout', onLogout(site));
   strategyService.addAuthRoutes(providers, router, site); // allow mocking this in tests
+
+  if (preventAuth) router.use(onLogout(site));
 
   // handle de-authentication errors. This occurs when a user is logged in
   // and someone removes them as a user. We need to catch the error
