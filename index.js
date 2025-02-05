@@ -193,7 +193,7 @@ function init({ router, providers, store, site, storage, bus }) {
 
   if (process.env.PREVENT_AUTH) {
     console.log('===============================================awefawef=====');
-    return router.use(onLogout(site));
+    router.use(onLogout(site));
   }
 
   // handle de-authentication errors. This occurs when a user is logged in
