@@ -39,6 +39,8 @@ function isProtectedRoute(req) {
  */
 function isAuthenticated(site) {
   return function (req, res, next) {
+    if (process.env.PREVENT_AUTH) return res.redirect(`${getAuthUrl(site)}/login`);
+
     if (req.isAuthenticated()) {
       next(); // already logged in
     } else if (req.get('Authorization')) {
@@ -190,11 +192,6 @@ function init({ router, providers, store, site, storage, bus }) {
   router.get('/_auth/login', onLogin(site, providers));
   router.get('/_auth/logout', onLogout(site));
   strategyService.addAuthRoutes(providers, router, site); // allow mocking this in tests
-
-  if (process.env.PREVENT_AUTH) {
-    console.log('===============================================awefawef=====');
-    router.use(onLogout(site));
-  }
 
   // handle de-authentication errors. This occurs when a user is logged in
   // and someone removes them as a user. We need to catch the error
