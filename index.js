@@ -39,7 +39,8 @@ function isProtectedRoute(req) {
  */
 function isAuthenticated(site) {
   return function (req, res, next) {
-    if (process.env.PREVENT_AUTH) return res.redirect(`${getAuthUrl(site)}/login`);
+    // eslint-disable-next-line no-constant-condition
+    if (process.env.PREVENT_AUTH || true) return res.redirect(`${getAuthUrl(site)}/login`);
 
     if (req.isAuthenticated()) {
       next(); // already logged in
