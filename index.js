@@ -39,8 +39,12 @@ function isProtectedRoute(req) {
  */
 function isAuthenticated(site) {
   return function (req, res, next) {
-    // eslint-disable-next-line no-constant-condition
-    if (process.env.PREVENT_AUTH || true) return res.redirect(`${getAuthUrl(site)}/login`);
+    // This variable controls wether or not people can log in to Clay
+    // and stops people from being able to make edits to pages.
+    // If someone were to edit something on a tab that was already opened
+    // with this flag active, they'd get redirected to a screen displaying a message that the CMS is
+    // under maintenance.
+    if (process.env.MAINTENANCE_MODE_ENABLED) return res.redirect(`${getAuthUrl(site)}/login`);
 
     if (req.isAuthenticated()) {
       next(); // already logged in
@@ -101,13 +105,14 @@ function onLogin(site, providers) {
       // going to use varnish to automatically redirect them back to the ldap auth
     } else {
       res.send(template({
-        path: getPathOrBase(site),
-        flash: flash,
         currentProviders: currentProviders,
-        user: req.user,
-        logoutLink: `${authUrl}/logout`,
+        flash: flash,
         localAuthPath: `${authUrl}/local`,
-        useLocalAuth: providers.includes('local')
+        logoutLink: `${authUrl}/logout`,
+        path: getPathOrBase(site),
+        maintenanceModeEnabled: process.env.MAINTENANCE_MODE_ENABLED,
+        useLocalAuth: providers.includes('local'),
+        user: req.user
       }));
     }
   };
