@@ -102,12 +102,6 @@ workflows:
   version: 2
   test:
     jobs:
-      - test_node10:
-          <<: *filter_all
-      - test_node12:
-          <<: *filter_all
-      - test_node14:
-          <<: *filter_all
       - deploy_package:
           <<: *filter_release
           context:

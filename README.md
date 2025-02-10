@@ -83,6 +83,14 @@ export LDAP_SEARCH_BASE=<LDAP_SEARCH_BASE>
 export LDAP_SEARCH_FILTER=<LDAP_SEARCH_FILTER>
 ```
 
+The following env variables are optional:
+
+This flag, when true, will prevent users from either going into edit mode or making any edits to a page they had already opened in edit mode in their browsers. This environment variable is optional and you can set it up from your Clay instance and it'll be picked up here since it'll share the same env file!
+It will redirect users to the login page where they'll see a message saying that Clay is under maintenance.
+```bash
+export MAINTENANCE_MODE_ENABLED=true
+```
+
 ## License
 
 MIT

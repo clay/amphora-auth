@@ -4,6 +4,15 @@
     <meta charset="utf-8">
     <title>Log In - Clay</title>
     <style>
+       @keyframes fadeIn {
+          from {
+            opacity: 0;
+            }
+          to {
+            opacity: 1;
+            }
+        }
+      animation: fadeIn 1s ease-in;
       .flash-error,
       .header,
       .details,
@@ -52,6 +61,15 @@
       .separator {
         text-align: center;
         width: 100%;
+      }
+      .details.maintenance {
+        animation: fadeIn 1s ease-in;
+        background-color: #FFF3CD;
+        border-radius: 5px;
+        border: 2px solid #FFC107;
+        color: #FF0000;
+        font-size: 24px;
+        padding: 20px;
       }
 
       .header {
@@ -172,7 +190,10 @@
       {{else}}
         <h1 class="header">Welcome, {{ username }}</h1>
       {{/if}}
-      <p class="details">You are currently logged in to Clay</p>
+      <p class="details">You are currently logged in to Clay.</p>
+      {{#if ../maintenanceModeEnabled}}
+        <p class="details maintenance">Clay is undergoing some routine maintenance. It will be back online shortly.</p>
+      {{/if}}
     {{else}}
       <h1 class="header">Log in to Clay</h1>
       {{#if currentProviders.length}}<p class="details">Please choose the provider attached to your account</p>{{/if}}

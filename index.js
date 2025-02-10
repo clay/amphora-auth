@@ -13,7 +13,7 @@ const _isEmpty = require('lodash/isEmpty'),
   } = require('./utils'),
   createSessionStore = require('./services/session-store'),
   strategyService = require('./strategies'),
-  { AUTH_LEVELS } = require('./constants'),
+  { AUTH_LEVELS, MAINTENANCE_MODE_ENABLED } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
   { setDb } = require('./services/storage'),
   { setBus } = require('./controllers/users');
@@ -39,6 +39,13 @@ function isProtectedRoute(req) {
  */
 function isAuthenticated(site) {
   return function (req, res, next) {
+    // This variable controls wether or not people can log in to Clay
+    // and stops people from being able to make edits to pages.
+    // If someone were to edit something on a tab that was already opened,
+    // or attempted to go into edit mode, with this flag active,
+    // they'd get redirected to a screen displaying a message that the CMS is under maintenance.
+    if (MAINTENANCE_MODE_ENABLED) return res.redirect(`${getAuthUrl(site)}/login`);
+
     if (req.isAuthenticated()) {
       next(); // already logged in
     } else if (req.get('Authorization')) {
@@ -98,13 +105,14 @@ function onLogin(site, providers) {
       // going to use varnish to automatically redirect them back to the ldap auth
     } else {
       res.send(template({
-        path: getPathOrBase(site),
-        flash: flash,
         currentProviders: currentProviders,
-        user: req.user,
-        logoutLink: `${authUrl}/logout`,
+        flash: flash,
         localAuthPath: `${authUrl}/local`,
-        useLocalAuth: providers.includes('local')
+        logoutLink: `${authUrl}/logout`,
+        path: getPathOrBase(site),
+        maintenanceModeEnabled: MAINTENANCE_MODE_ENABLED,
+        useLocalAuth: providers.includes('local'),
+        user: req.user
       }));
     }
   };
