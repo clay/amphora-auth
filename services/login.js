@@ -10,7 +10,7 @@ const _each = require('lodash/each'),
  */
 function compileLoginPage() {
   const tpl = utils.compileTemplate('login.handlebars'),
-    icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito'];
+    icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito', 'active-directory'];
 
   // add svgs to handlebars
   _each(icons, icon => {
