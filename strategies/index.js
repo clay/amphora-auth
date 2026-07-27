@@ -1,13 +1,12 @@
-'use strict';
+"use strict";
 
 const STRATEGIES = {
-  apikey: require('./key'),
-  cognito: require('./cognito'),
-  google: require('./google'),
-  ldap: require('./ldap'),
-  twitter: require('./twitter'),
-  slack: require('./slack'),
-  local: require('./local')
+  apikey: require("./key"),
+  cognito: require("./cognito"),
+  google: require("./google"),
+  ldap: require("./ldap"),
+  slack: require("./slack"),
+  local: require("./local"),
 };
 
 /**
@@ -20,12 +19,12 @@ function createStrategy(providers, site) {
   // Add API Key auth
   STRATEGIES.apikey(site);
 
-  providers.forEach(provider => {
+  providers.forEach((provider) => {
     if (!STRATEGIES[provider]) {
       throw new Error(`Unknown provider: ${provider}!`);
     }
 
-    if (provider !== 'apikey') STRATEGIES[provider](site);
+    if (provider !== "apikey") STRATEGIES[provider](site);
   });
 }
 /**
@@ -35,10 +34,11 @@ function createStrategy(providers, site) {
  * @param {object} site
  */
 function addAuthRoutes(providers, router, site) {
-  STRATEGIES.apikey.addAuthRoutes(router, site, 'apikey');
+  STRATEGIES.apikey.addAuthRoutes(router, site, "apikey");
 
-  providers.forEach(provider => {
-    if (provider !== 'apikey') STRATEGIES[provider].addAuthRoutes(router, site, provider);
+  providers.forEach((provider) => {
+    if (provider !== "apikey")
+      STRATEGIES[provider].addAuthRoutes(router, site, provider);
   });
 }
 
