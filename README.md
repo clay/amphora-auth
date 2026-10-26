@@ -1,4 +1,4 @@
-# Amphora Auth [![Coverage Status](https://coveralls.io/repos/github/clay/amphora-auth/badge.svg?branch=master)](https://coveralls.io/github/clay/amphora-auth?branch=master)
+# Amphora Auth [![CI](https://github.com/clay/amphora-auth/actions/workflows/ci.yml/badge.svg)](https://github.com/clay/amphora-auth/actions/workflows/ci.yml)
 
 A module for Amphora to offer authentication in [Clay](https://clay.nymag.com/).
 
