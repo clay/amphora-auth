@@ -14,7 +14,6 @@ class Storage {
     this.get = jest.fn();
     this.put = jest.fn();
     this.del = jest.fn();
-    this.list = this.list;
     this.clearMem = this.clear;
     this.createReadStream = (ops) => this.inMem.createReadStream(ops);
     this.getLatestData = jest.fn();
