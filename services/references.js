@@ -1,7 +1,5 @@
 'use strict';
 
-const urlParse = require('url');
-
 /**
  * Take the protocol and port from a sourceUrl and apply them to some uri
  * @param {string} uri
@@ -10,21 +8,14 @@ const urlParse = require('url');
  * @returns {string}
  */
 function uriToUrl(uri, protocol, port) {
-  // just pretend to start with http; it's overwritten two lines down
-  const parts = urlParse.parse(`http://${uri}`);
+  // just pretend to start with http; it's overwritten on the next line
+  const url = new URL(`http://${uri}`);
 
-  parts.protocol = protocol || 'http';
-  parts.port = port || process.env.PORT;
-  delete parts.host;
+  url.protocol = protocol || 'http';
+  // the port of the uri itself is dropped; the default port of the protocol is left out of the result
+  url.port = port || process.env.PORT || '';
 
-  if (parts.port &&
-    (parts.protocol === 'http' && parts.port.toString() === '80') ||
-    parts.protocol === 'https' && parts.port.toString() === '443'
-  ) {
-    delete parts.port;
-  }
-
-  return parts.format();
+  return url.href;
 }
 
 module.exports.uriToUrl = uriToUrl;
