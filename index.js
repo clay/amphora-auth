@@ -1,6 +1,6 @@
 'use strict';
 const passport = require('passport'),
-  flash = require('express-flash'),
+  flash = require('./lib/flash'),
   { compileLoginPage } = require('./services/login'),
   {
     getAuthUrl,

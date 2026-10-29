@@ -1,7 +1,6 @@
 'use strict';
 
-const bluebird = require('bluebird'),
-  map = require('through2-map'),
+const { Transform } = require('stream'),
   { removePrefix, getUri } = require('../utils'),
   { includes, omit } = require('../lib/helpers'),
   omitProperties = ['password'],
@@ -21,9 +20,35 @@ let db = require('./storage'),
  * @param {object} res
  */
 function expectJSON(fn, res) {
-  bluebird.try(fn).then(function (result) {
+  new Promise(resolve => resolve(fn())).then(function (result) {
     res.json(result);
   }).catch(handleError(res));
+}
+
+/**
+ * true for an error that carries its own HTTP status (and isn't a "not found")
+ * @param {*} err
+ * @returns {boolean}
+ */
+function hasOwnStatus(err) {
+  return Boolean(err && err.status) && err.name !== 'NotFoundError';
+}
+
+/**
+ * @param {Error} err
+ * @returns {boolean}
+ */
+function isNotFound(err) {
+  return err.name === 'NotFoundError' || err.message.indexOf('ENOENT') !== -1 || err.message.indexOf('not found') !== -1;
+}
+
+/**
+ * true for something thrown or rejected that isn't an Error (no message to look at)
+ * @param {*} err
+ * @returns {boolean}
+ */
+function isNotAnError(err) {
+  return typeof err?.message !== 'string' && err?.name !== 'NotFoundError';
 }
 
 /**
@@ -33,13 +58,15 @@ function expectJSON(fn, res) {
  */
 function handleError(res) {
   return function (err) {
-    if (err.status && err.name !== 'NotFoundError') {
+    if (hasOwnStatus(err)) {
       // If we're in this block, the error has a defined `status` property and
       // the error should be directed out immediately
       sendDefaultResponseForCode(err.status, err.message, res);
-    } else if (err.name === 'NotFoundError' ||
-      err.message.indexOf('ENOENT') !== -1 ||
-      err.message.indexOf('not found') !== -1) {
+    } else if (isNotAnError(err)) {
+      // something that isn't an Error was thrown or rejected. Answer it as a server error instead of throwing here,
+      // which would leave the request without a response
+      serverError(new Error(typeof err === 'string' ? err : ''), res);
+    } else if (isNotFound(err)) {
       notFound(err, res);
       // if the word "client" is ever in a message, it should be for the client. We enforce that here.
     } else if (err.message.indexOf('Client') !== -1) {
@@ -247,11 +274,13 @@ function listUsers(options) {
         prefix: usersString,
         values: false,
         transforms() {
-          return [map({ wantStrings: true }, function (str) {
-            // We're going to construct base uri from the `getUri`
-            // function, but that will include `/_users` so we want
-            // to strip that out and then we're good
-            return `${getUri(req).replace(usersString, '')}${str}`;
+          return [new Transform({
+            transform(str, encoding, callback) {
+              // We're going to construct base uri from the `getUri`
+              // function, but that will include `/_users` so we want
+              // to strip that out and then we're good
+              callback(null, `${getUri(req).replace(usersString, '')}${str}`);
+            }
           })];
         }
       }, options),

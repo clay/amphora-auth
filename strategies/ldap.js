@@ -2,7 +2,7 @@
 
 const passport = require('passport'),
   LDAPStrategy = require('passport-ldapauth'),
-  basicAuth = require('basic-auth'),
+  basicAuth = require('../lib/basic-auth'),
   utils = require('../utils');
 
 /**
