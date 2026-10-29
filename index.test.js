@@ -83,9 +83,9 @@ describe(_startCase(filename), function () {
     it('calls `onLogout` if is an error', function () {
       const nextSpy = jest.fn(),
         redirect = jest.fn(),
-        logout = jest.fn();
+        logout = jest.fn(callback => callback());
 
-      cb(new Error('error'), { logout }, { redirect }, nextSpy);
+      cb(new Error('error'), { user: {}, logout }, { redirect }, nextSpy);
       expect(logout).toBeCalled();
       expect(redirect).toBeCalled();
       expect(nextSpy).not.toBeCalled();
@@ -140,7 +140,7 @@ describe(_startCase(filename), function () {
     const fn = lib[this.description];
 
     it('logs out the user', function () {
-      const req = { logout: jest.fn() };
+      const req = { user: {}, logout: jest.fn() };
 
       fn({ path: '' })(req, { redirect: _noop });
       expect(req.logout).toBeCalled();
@@ -149,7 +149,7 @@ describe(_startCase(filename), function () {
     it('redirects to the login page', function () {
       const res = { redirect: jest.fn() };
 
-      fn({ prefix: 'domain.com' })({ logout: _noop }, res);
+      fn({ prefix: 'domain.com' })({ logout: callback => callback() }, res);
       expect(res.redirect).toBeCalledWith('http://domain.com/_auth/login');
     });
   });

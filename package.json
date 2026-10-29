@@ -24,7 +24,7 @@
     "connect-redis": "^3.4.0",
     "express-session": "^1.15.6",
     "handlebars": "^4.7.10",
-    "passport": "^0.3.2",
+    "passport": "^0.7.0",
     "passport-cognito-oauth2": "^0.1.1",
     "passport-google-oauth": "^1.0.0",
     "passport-http-header-token": "^1.1.0",
