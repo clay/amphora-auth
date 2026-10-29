@@ -21,9 +21,10 @@
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "clay-log": "^1.6.0",
-    "connect-redis": "^3.4.0",
+    "connect-redis": "^8.1.0",
     "express-session": "^1.15.6",
     "handlebars": "^4.7.10",
+    "ioredis": "^5.11.1",
     "passport": "^0.7.0",
     "passport-cognito-oauth2": "^0.1.1",
     "passport-google-oauth": "^1.0.0",
