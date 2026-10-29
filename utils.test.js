@@ -48,8 +48,8 @@ describe('utils', () => {
 
   describe('generateStrategyName', () => {
     it('is the provider and the slug, of the subsite when there is one', () => {
-      assert.equal(utils.generateStrategyName('twitter', { slug: 'nymag' }), 'twitter-nymag');
-      assert.equal(utils.generateStrategyName('twitter', { slug: 'nymag', subsiteSlug: 'sub' }), 'twitter-sub');
+      assert.equal(utils.generateStrategyName('twitter', { slug: 'example' }), 'twitter-example');
+      assert.equal(utils.generateStrategyName('twitter', { slug: 'example', subsiteSlug: 'sub' }), 'twitter-sub');
     });
   });
 
@@ -83,13 +83,13 @@ describe('utils', () => {
 
   describe('removeQueryString and removeExtension', () => {
     it('remove the query string', () => {
-      assert.equal(utils.removeQueryString('http://nymag.com?edit=true'), 'http://nymag.com');
-      assert.equal(utils.removeQueryString('http://nymag.com'), 'http://nymag.com');
+      assert.equal(utils.removeQueryString('http://example.com?edit=true'), 'http://example.com');
+      assert.equal(utils.removeQueryString('http://example.com'), 'http://example.com');
     });
 
     it('remove the extension of the last part', () => {
-      assert.equal(utils.removeExtension('http://nymag.com/_pages/homepage.html'), 'http://nymag.com/_pages/homepage');
-      assert.equal(utils.removeExtension('http://nymag.com/_pages/homepage'), 'http://nymag.com/_pages/homepage');
+      assert.equal(utils.removeExtension('http://example.com/_pages/homepage.html'), 'http://example.com/_pages/homepage');
+      assert.equal(utils.removeExtension('http://example.com/_pages/homepage'), 'http://example.com/_pages/homepage');
       assert.equal(utils.removeExtension('homepage.html'), 'homepage');
       assert.equal(utils.removeExtension('a.b/c'), 'a.b/c');
     });
