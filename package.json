@@ -8,8 +8,16 @@
     "test": "npm run lint && NODE_OPTIONS=--unhandled-rejections=warn jest --forceExit",
     "release": "./scripts/release.sh"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clay/amphora-auth.git"
+  },
   "author": "",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/clay/amphora-auth/issues"
+  },
+  "homepage": "https://github.com/clay/amphora-auth#readme",
   "dependencies": {
     "basic-auth": "^2.0.1",
     "bcryptjs": "^2.4.3",
