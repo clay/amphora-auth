@@ -1,17 +1,11 @@
 'use strict';
 
-const _get = require('lodash/get'),
-  _defaults = require('lodash/defaults'),
-  _map = require('lodash/map'),
-  _capitalize = require('lodash/capitalize'),
-  _constant = require('lodash/constant'),
-  _reject = require('lodash/reject'),
-  _last = require('lodash/last'),
-  fs = require('fs'),
+const fs = require('fs'),
   path = require('path'),
   handlebars = require('handlebars'),
   references = require('./services/references'),
-  { isValidPassword } = require('./services/encrypt');
+  { isValidPassword } = require('./services/encrypt'),
+  { get, defaults, capitalize } = require('./lib/helpers');
 
 let db = require('./services/storage');
 
@@ -36,7 +30,7 @@ function encode(username, provider) {
 function getAuthUrl(site) {
   const base = references.uriToUrl(site.prefix, site.protocol, site.port);
 
-  return _last(base) === '/' ? `${base}_auth` : `${base}/_auth`;
+  return base.endsWith('/') ? `${base}_auth` : `${base}/_auth`;
 }
 
 /**
@@ -67,10 +61,10 @@ function getCallbackUrl(site, provider) {
  */
 function verify(properties) {
   return function (req, token, tokenSecret, profile, done) { // eslint-disable-line
-    const username = _get(profile, properties.username),
-      imageUrl = _get(profile, properties.imageUrl, ''),
-      name = _get(profile, properties.name, ''),
-      password = _get(profile, properties.password, ''),
+    const username = get(profile, properties.username),
+      imageUrl = get(profile, properties.imageUrl, ''),
+      name = get(profile, properties.name, ''),
+      password = get(profile, properties.password, ''),
       provider = properties.provider;
 
     if (!username) {
@@ -85,7 +79,7 @@ function verify(properties) {
       return db.get(uid)
         .then(data => {
           // only update the user data if the property doesn't exist (name might have been changed through the kiln UI)
-          return _defaults(data, {
+          return defaults(data, {
             imageUrl: imageUrl,
             name: name
           });
@@ -164,15 +158,14 @@ function deserializeUser(uid, done) {
  * @returns {Object[]}
  */
 function getProviders(providers, site) {
-  return _map(
-    _reject(providers, provider => provider === 'apikey' || provider === 'local'),
-    provider => ({
+  return (providers || [])
+    .filter(provider => provider !== 'apikey' && provider !== 'local')
+    .map(provider => ({
       name: provider,
       url: `${getAuthUrl(site)}/${provider}`,
-      title: `Log in with ${_capitalize(provider)}`,
-      icon: _constant(provider) // a function that returns the provider
-    })
-  );
+      title: `Log in with ${capitalize(provider)}`,
+      icon: () => provider // a function that returns the provider
+    }));
 }
 
 /**

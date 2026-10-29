@@ -1,7 +1,5 @@
 'use strict';
-const _isEmpty = require('lodash/isEmpty'),
-  _includes = require('lodash/includes'),
-  passport = require('passport'),
+const passport = require('passport'),
   flash = require('express-flash'),
   { compileLoginPage } = require('./services/login'),
   {
@@ -16,7 +14,8 @@ const _isEmpty = require('lodash/isEmpty'),
   { AUTH_LEVELS, MAINTENANCE_MODE_ENABLED } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
   { setDb } = require('./services/storage'),
-  { setBus } = require('./controllers/users');
+  { setBus } = require('./controllers/users'),
+  { isEmpty, includes } = require('./lib/helpers');
 
 /**
  * determine if a route is protected
@@ -27,8 +26,8 @@ const _isEmpty = require('lodash/isEmpty'),
 function isProtectedRoute(req) {
   return (
     !!req.query.edit
-    || !_includes(req.originalUrl, '/_auth')
-    && !_includes(['GET', 'HEAD'], req.method)
+    || !includes(req.originalUrl, '/_auth')
+    && !includes(['GET', 'HEAD'], req.method)
   );
 }
 
@@ -90,7 +89,7 @@ function onLogin(site, providers) {
       authUrl = getAuthUrl(site),
       flash = req.flash();
 
-    if (flash && _includes(flash.error, 'Invalid username/password')) {
+    if (flash && includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
       res.setHeader('WWW-Authenticate', 'Basic realm="Incorrect Credentials"');
       res.end('Access denied');
@@ -172,7 +171,7 @@ function addUser(req, res, next) {
  * @returns {object[]}
  */
 function init({ router, providers, store, site, storage, bus }) {
-  if (_isEmpty(providers)) {
+  if (isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
 

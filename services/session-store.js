@@ -3,7 +3,7 @@
 let session = require('express-session');
 
 const RedisStore = require('connect-redis')(session),
-  _isEmpty = require('lodash/isEmpty'),
+  { isEmpty } = require('../lib/helpers'),
   { SECRET } = require('../constants'),
   { REDIS_DB, REDIS_SESSION_HOST } = process.env,
   sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:';
@@ -14,7 +14,7 @@ const RedisStore = require('connect-redis')(session),
  * @returns {Object}
  */
 function createSessionStore(store = {}) {
-  const redisStore = !_isEmpty(store)
+  const redisStore = !isEmpty(store)
     ? store
     : new RedisStore({
       url: REDIS_SESSION_HOST,

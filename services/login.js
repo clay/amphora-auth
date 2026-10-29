@@ -1,7 +1,6 @@
 'use strict';
 
-const _each = require('lodash/each'),
-  handlebars = require('handlebars'),
+const handlebars = require('handlebars'),
   utils = require('../utils');
 
 /**
@@ -13,7 +12,7 @@ function compileLoginPage() {
     icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito'];
 
   // add svgs to handlebars
-  _each(icons, icon => {
+  icons.forEach(icon => {
     handlebars.registerPartial(icon, utils.compileTemplate(`${icon}.svg`));
   });
 

@@ -1,13 +1,9 @@
 'use strict';
 
-const _assign = require('lodash/assign'),
-  _has = require('lodash/has'),
-  _includes = require('lodash/includes'),
-  _last = require('lodash/last'),
-  _omit = require('lodash/omit'),
-  bluebird = require('bluebird'),
+const bluebird = require('bluebird'),
   map = require('through2-map'),
   { removePrefix, getUri } = require('../utils'),
+  { includes, omit } = require('../lib/helpers'),
   omitProperties = ['password'],
   STATUS_CODE_ERROR = 400;
 let db = require('./storage'),
@@ -106,7 +102,7 @@ function sendHTMLErrorCode(code, message, res) {
  */
 function sendJSONErrorCode(code, message, res, extras) {
   return function () {
-    res.json(_assign({ message, code }, extras));
+    res.json(Object.assign({ message, code }, extras));
   };
 }
 
@@ -201,7 +197,7 @@ function methodNotAllowed(options) {
     let message, code,
       method = req.method;
 
-    if (_includes(allowed, method.toLowerCase())) {
+    if (includes(allowed, method.toLowerCase())) {
       next();
     } else {
       code = 405;
@@ -247,7 +243,7 @@ function notAcceptable(options) {
 function listUsers(options) {
   return function (req, res) {
     const usersString = '/_users/',
-      listOptions = _assign({
+      listOptions = Object.assign({
         prefix: usersString,
         values: false,
         transforms() {
@@ -275,7 +271,7 @@ function listUsers(options) {
 function denyReferenceAtRoot(req, res, next) {
   const { body } = req;
 
-  if (_has(body, '_ref')) {
+  if (body != null && Object.hasOwn(body, '_ref')) {
     sendDefaultResponseForCode(STATUS_CODE_ERROR, 'Reference (_ref) at root of object is not acceptable', res);
   } else {
     next();
@@ -303,7 +299,7 @@ function acceptJSONOnly(req, res, next) {
  * @param {function} next
  */
 function denyTrailingSlashOnId(req, res, next) {
-  if (_last(req.path) === '/') {
+  if (req.path?.endsWith('/')) {
     sendDefaultResponseForCode(STATUS_CODE_ERROR, 'Trailing slash on RESTful id in URL is not acceptable', res);
   } else {
     next();
@@ -318,7 +314,7 @@ function denyTrailingSlashOnId(req, res, next) {
 function getRouteFromDB(req, res) {
   expectJSON(() => {
     return db.get(req.uri)
-      .then(users => _omit(users, omitProperties));
+      .then(users => omit(users, omitProperties));
   }, res);
 }
 
