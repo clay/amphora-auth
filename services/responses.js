@@ -166,7 +166,7 @@ function notFound(err, res) {
  * @param {object} res
  */
 function clientError(err, res) {
-  log('error', err.message, { stack: err.stack });
+  log('error', err.message || 'Client Error', { error: err });
 
   // They know it's a 400 already, we don't need to repeat the fact that its an error.
   const message = removePrefix(err.message, ':'),
@@ -184,7 +184,7 @@ function clientError(err, res) {
  */
 function serverError(err, res) {
   // error is required to be logged
-  log('error', err.message, { stack: err.stack });
+  log('error', err.message || 'Server Error', { error: err });
 
   const message = err.message || 'Server Error', // completely hide these messages from outside
     code = 500;

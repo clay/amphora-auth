@@ -148,7 +148,7 @@ describe(_startCase(filename), function () {
       // Reset the error message to test for default response
       err.message = '';
       expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', '', expect.any(Object));
+        expect(fakeLog).toBeCalledWith('error', 'Server Error', { error: err });
         expect(mockRes.status).toBeCalledWith(500);
         done();
       });
