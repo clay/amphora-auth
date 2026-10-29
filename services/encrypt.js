@@ -8,7 +8,9 @@ const bcrypt = require('bcryptjs');
  * @returns {string}
  */
 function hashPassword(password) {
-  return bcrypt.hashSync(password, bcrypt.genSaltSync(10));
+  // bcryptjs 3 starts new salts with $2b$ where 2.4.3 used $2a$. The hash is the same either way; keep the prefix
+  // the stored hashes have had
+  return bcrypt.hashSync(password, bcrypt.genSaltSync(10).replace(/^\$2b\$/, () => '$2a$'));
 }
 
 /**
