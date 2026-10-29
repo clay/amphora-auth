@@ -1,66 +1,76 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  _includes = require('lodash/includes'),
+const { describe, it, beforeEach, afterEach, mock } = require('node:test'),
+  assert = require('node:assert/strict'),
   passport = require('passport'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+  key = require('./key'),
+  call = apikey => new Promise(resolve => key.apiCallback(apikey, (...args) => resolve(args)));
 
-describe(_startCase(filename), function () {
-  describe('apiCallback', function () {
-    const fn = lib[this.description];
+describe('key strategy', () => {
+  const original = process.env.CLAY_ACCESS_KEY;
 
-    it('allows api key that matches CLAY_ACCESS_KEY', function (done) {
-      const oldKey = process.env.CLAY_ACCESS_KEY;
+  beforeEach(() => {
+    process.env.CLAY_ACCESS_KEY = '123';
+  });
 
-      process.env.CLAY_ACCESS_KEY = '123';
-      fn('123', function (err, data) {
-        expect(err).toEqual(null);
-        expect(data).toEqual({ provider: 'apikey', auth: 'admin' });
-        process.env.CLAY_ACCESS_KEY = oldKey;
-        done();
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.CLAY_ACCESS_KEY;
+    } else {
+      process.env.CLAY_ACCESS_KEY = original;
+    }
+  });
+
+  describe('apiCallback', () => {
+    it('lets in the key that is CLAY_ACCESS_KEY, as an admin', async () => {
+      assert.deepEqual(await call('123'), [null, { provider: 'apikey', auth: 'admin' }]);
+    });
+
+    it('does not let in another key', async () => {
+      ['456', '1234', '12', '', '123 ', 'x'.repeat(5000)].forEach(async apikey => {
+        const [error, user, info] = await call(apikey);
+
+        assert.equal(error, null);
+        assert.equal(user, false);
+        assert.equal(info.message, `Unknown apikey: ${apikey}`);
       });
     });
 
-    it('disallows api key that does not match CLAY_ACCESS_KEY', function (done) {
-      const oldKey = process.env.CLAY_ACCESS_KEY;
+    it('does not let in anything that is not a string', async () => {
+      for (const apikey of [undefined, null, 123, ['123'], { toString: () => '123' }]) {
+        assert.equal((await call(apikey))[1], false);
+      }
+    });
 
-      process.env.CLAY_ACCESS_KEY = '123';
-      fn('456', function (err, data, status) {
-        expect(err).toEqual(null);
-        expect(data).toEqual(false);
-        expect(status.message).toEqual('Unknown apikey: 456');
-        process.env.CLAY_ACCESS_KEY = oldKey;
-        done();
-      });
+    it('lets in nobody when there is no CLAY_ACCESS_KEY', async () => {
+      delete process.env.CLAY_ACCESS_KEY;
+      assert.equal((await call(undefined))[1], false);
+      assert.equal((await call('undefined'))[1], false);
     });
   });
 
-  describe('createAPIKeyStrategy', function () {
-    it('creates apikey strategy', function () {
-      passport.use = jest.fn();
+  describe('createAPIKeyStrategy', () => {
+    it('registers the apikey strategy with passport', () => {
+      const use = mock.method(passport, 'use', () => {});
 
-      lib();
-
-      expect(passport.use).toBeCalled();
+      key();
+      assert.equal(use.mock.callCount(), 1);
+      assert.equal(use.mock.calls[0].arguments[0], 'apikey');
+      assert.equal(use.mock.calls[0].arguments[1].name, 'http-header-token');
+      use.mock.restore();
     });
   });
 
-  describe('addAuthRoutes', function () {
-    const fn = lib[this.description],
-      paths = [],
-      router = {
-        get: function (path) {
-          // testing if the paths are added,
-          // we're checking the paths array after each test
-          paths.push(path);
-        }
-      };
+  describe('addAuthRoutes', () => {
+    it('adds the route and its callback', () => {
+      const routes = [],
+        authenticate = mock.method(passport, 'authenticate', (...args) => args),
+        router = { get: (...args) => routes.push(args) };
 
-    it('adds apikey auth and callback routes', function () {
-      fn(router, {}, 'apikey');
-      expect(_includes(paths, '/_auth/apikey')).toEqual(true);
-      expect(_includes(paths, '/_auth/apikey/callback')).toEqual(true);
+      key.addAuthRoutes(router, { slug: 'site', prefix: 'foo.com', protocol: 'http', port: 80, path: '/' }, 'apikey');
+      assert.deepEqual(routes[0], ['/_auth/apikey', ['apikey-site']]);
+      assert.deepEqual(routes[1], ['/_auth/apikey/callback', ['apikey-site', { failureRedirect: 'http://foo.com/_auth/login', failureFlash: true, successReturnToOrRedirect: '/' }]]);
+      authenticate.mock.restore();
     });
   });
 });

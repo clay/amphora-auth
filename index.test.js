@@ -1,206 +1,244 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  _noop = require('lodash/noop'),
+process.env.LOG = 'silent';
+
+const { describe, it, mock } = require('node:test'),
+  { EventEmitter } = require('events'),
+  assert = require('node:assert/strict'),
   passport = require('passport'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`),
-  strategyService = require('./strategies');
+  { createRes } = require('./test/helpers/mocks'),
+  lib = require('./index'),
+  strategyService = require('./strategies'),
+  site = { slug: 'site', prefix: 'domain.com', protocol: 'http', port: 80, path: '/' },
+  logoutOf = calls => (...args) => {
+    calls.push('logout');
+    args.find(arg => typeof arg === 'function')();
+  };
 
-describe(_startCase(filename), function () {
-  describe('isProtectedRoute', function () {
-    const fn = lib[this.description];
+describe('index', () => {
+  it('exports what amphora and the sites use', () => {
+    assert.equal(typeof lib, 'function');
+    assert.equal(lib.length, 1);
+    assert.equal(typeof lib.withAuthLevel, 'function');
+    assert.deepEqual(lib.authLevels, { ADMIN: 'admin', WRITE: 'write' });
+    assert.equal(typeof lib.addRoutes, 'function');
+    ['isProtectedRoute', 'isAuthenticated', 'protectRoutes', 'checkAuthentication', 'onLogin', 'onLogout', 'addUser'].forEach(name => assert.equal(typeof lib[name], 'function', name));
+  });
 
-    it('is true if edit mode', function () {
-      expect(fn({ query: { edit: true }})).toEqual(true);
+  describe('isProtectedRoute', () => {
+    it('is true in edit mode, and for anything that is not a GET or a HEAD', () => {
+      assert.equal(lib.isProtectedRoute({ query: { edit: true } }), true);
+      assert.equal(lib.isProtectedRoute({ query: { edit: 'true' }, method: 'GET' }), true);
+      ['POST', 'PUT', 'DELETE', 'PATCH'].forEach(method => assert.equal(lib.isProtectedRoute({ query: {}, method }), true, method));
     });
 
-    it('is true if POST to api', function () {
-      expect(fn({ query: {}, method: 'POST' })).toEqual(true);
+    it('is false for a GET or a HEAD', () => {
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'GET' }), false);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'HEAD' }), false);
     });
 
-    it('is true if PUT to api', function () {
-      expect(fn({ query: {}, method: 'PUT' })).toEqual(true);
-    });
-
-    it('is true if DELETE to api', function () {
-      expect(fn({ query: {}, method: 'DELETE' })).toEqual(true);
-    });
-
-    it('is false if GET to api (or non-edit page)', function () {
-      expect(fn({ query: {}, method: 'GET' })).toEqual(false);
-    });
-
-    it('is false if HEAD to api (or non-edit page)', function () {
-      expect(fn({ query: {}, method: 'HEAD' })).toEqual(false);
+    it('is false for the auth routes, except in edit mode', () => {
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl: '/_auth/local' }), false);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl: '/site/_auth/local' }), false);
+      assert.equal(lib.isProtectedRoute({ query: { edit: '1' }, method: 'POST', originalUrl: '/_auth/local' }), true);
     });
   });
 
-  describe('isAuthenticated', function () {
-    const fn = lib[this.description];
+  describe('isAuthenticated', () => {
+    it('goes on if the user is signed in', () => {
+      const calls = [];
 
-    it('passes through if authenticated (through session, etc)', function (done) {
-      fn()({ isAuthenticated: () => true }, null, done);
+      lib.isAuthenticated(site)({ isAuthenticated: () => true }, createRes(), () => calls.push('next'));
+      assert.deepEqual(calls, ['next']);
     });
 
-    it('calls apikey auth if Authorization header is sent', function (done) {
-      passport.authenticate = jest.fn().mockReturnValue((req, res, next) => next());
+    it('tries the api key when there is an Authorization header', () => {
+      const authenticate = mock.method(passport, 'authenticate', () => (req, res, next) => next()),
+        calls = [];
 
-      fn()({ isAuthenticated: () => false, get: () => true }, null, function () {
-        expect(passport.authenticate).toBeCalled();
-        done();
-      });
+      lib.isAuthenticated(site)({ isAuthenticated: () => false, get: header => header === 'Authorization' ? 'token x' : undefined }, createRes(), () => calls.push('next'));
+      assert.deepEqual(authenticate.mock.calls[0].arguments, ['apikey', { session: false }]);
+      assert.deepEqual(calls, ['next']);
+      authenticate.mock.restore();
     });
 
-    it('sets return url and redirects to login page if not authenticated', function () {
-      const req = {
-          isAuthenticated: () => false,
-          get: () => false,
-          originalUrl: 'domain.com',
-          session: {}
-        },
-        res = {
-          redirect: jest.fn()
-        };
+    it('remembers where the user was going and sends them to the login page', () => {
+      const req = { isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true', session: {} },
+        res = createRes();
 
-      fn({ path: '/' })(req, res); // never calls next(), but checks synchronously
-      expect(req.session.returnTo).toEqual(req.originalUrl);
-      expect(res.redirect.call.length).toEqual(1);
+      lib.isAuthenticated(site)(req, res, () => assert.fail('next'));
+      assert.equal(req.session.returnTo, '/page?edit=true');
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
   });
 
-  describe('checkAuthentication', function () {
-    const fn = lib[this.description],
-      cb = fn({ path: '/foo', prefix: 'domain.com/foo', port: '80'});
+  describe('protectRoutes', () => {
+    it('checks protected routes, and lets the rest go by', () => {
+      const calls = [],
+        protectedRoute = { method: 'PUT', query: {}, isAuthenticated: () => true },
+        publicRoute = { method: 'GET', query: {}, isAuthenticated: () => assert.fail('checked') };
 
-    it('calls `next` if no error', function () {
-      const nextSpy = jest.fn();
-
-      cb(null, {}, {}, nextSpy);
-      expect(nextSpy).toBeCalled();
+      lib.protectRoutes(site)(protectedRoute, createRes(), () => calls.push('protected'));
+      lib.protectRoutes(site)(publicRoute, createRes(), () => calls.push('public'));
+      assert.deepEqual(calls, ['protected', 'public']);
     });
 
-    it('calls `onLogout` if is an error', function () {
-      const nextSpy = jest.fn(),
-        redirect = jest.fn(),
-        logout = jest.fn(callback => callback());
+    it('never checks OPTIONS', () => {
+      const calls = [];
 
-      cb(new Error('error'), { user: {}, logout }, { redirect }, nextSpy);
-      expect(logout).toBeCalled();
-      expect(redirect).toBeCalled();
-      expect(nextSpy).not.toBeCalled();
+      lib.protectRoutes(site)({ method: 'OPTIONS', query: { edit: true }, isAuthenticated: () => assert.fail('checked') }, createRes(), () => calls.push('next'));
+      assert.deepEqual(calls, ['next']);
     });
   });
 
-  describe('protectRoutes', function () {
-    const fn = lib[this.description];
+  describe('onLogin', () => {
+    it('shows the login page, with the providers and the flash', () => {
+      const res = createRes();
 
-    it('authenticates against protected routes', function (done) {
-      lib.isProtectedRoute = jest.fn().mockReturnValue(true);
-      lib.isAuthenticated = jest.fn().mockReturnValue((req, res, next) => next());
-
-      fn({})({}, {}, function () {
-        expect(lib.isAuthenticated).toBeCalled();
-        done();
-      });
+      lib.onLogin(site, ['google', 'local'])({ flash: () => ({ error: ['Invalid Password'] }) }, res);
+      assert.equal(res.calls[0][0], 'send');
+      assert.match(res.calls[0][1], /Log in with Google/);
+      assert.match(res.calls[0][1], /Invalid Password/);
+      assert.match(res.calls[0][1], /id="username"/); // the form of the local provider
     });
 
-    it('passes through unprotected routes', function (done) {
-      lib.isProtectedRoute = jest.fn().mockReturnValue(false);
-      lib.isAuthenticated = jest.fn();
+    it('shows who is signed in, and a way to log out', () => {
+      const res = createRes();
 
-      fn({})({}, {}, function () {
-        expect(lib.isAuthenticated).not.toBeCalled();
-        done();
-      });
-    });
-  });
-
-  describe('onLogin', function () {
-    const fn = lib[this.description],
-      mockRes = {
-        setHeader: jest.fn(),
-        send: jest.fn(),
-        end: jest.fn(),
-      };
-
-    it('shows the login page if there are no errors', function () {
-      fn({ path: '' }, [])({ flash: _noop }, mockRes);
-      expect(mockRes.send).toBeCalled();
+      lib.onLogin(site, ['google'])({ flash: () => ({}), user: { username: 'ann@example.com', name: 'Ann' } }, res);
+      assert.match(res.calls[0][1], /Welcome, Ann/);
+      assert.match(res.calls[0][1], /href="http:\/\/domain.com\/_auth\/logout"/);
     });
 
-    it('forcibly clears http credentials if there is a credential error', function () {
-      fn({ path: '' }, [])({ flash: function () { return { error: ['Invalid username/password'] }; } }, mockRes);
-      expect(mockRes.setHeader).toBeCalledWith('WWW-Authenticate', 'Basic realm="Incorrect Credentials"');
-      expect(mockRes.end).toBeCalledWith('Access denied');
+    it('asks for the credentials again when the ones sent were wrong', () => {
+      const res = createRes();
+
+      lib.onLogin(site, [])({ flash: () => ({ error: ['Invalid username/password'] }) }, res);
+      assert.equal(res.statusCode, 401);
+      assert.deepEqual(res.calls, [['setHeader', 'WWW-Authenticate', 'Basic realm="Incorrect Credentials"'], ['end', 'Access denied']]);
     });
   });
 
-  describe('onLogout', function () {
-    const fn = lib[this.description];
+  describe('onLogout', () => {
+    it('logs the user out and goes to the login page', () => {
+      const calls = [],
+        res = createRes();
 
-    it('logs out the user', function () {
-      const req = { user: {}, logout: jest.fn() };
-
-      fn({ path: '' })(req, { redirect: _noop });
-      expect(req.logout).toBeCalled();
+      lib.onLogout(site)({ user: { a: 1 }, logout: logoutOf(calls) }, res);
+      assert.deepEqual(calls, ['logout']);
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
 
-    it('redirects to the login page', function () {
-      const res = { redirect: jest.fn() };
+    it('logs out a session whose user is gone', () => {
+      const calls = [];
 
-      fn({ prefix: 'domain.com' })({ logout: callback => callback() }, res);
-      expect(res.redirect).toBeCalledWith('http://domain.com/_auth/login');
-    });
-  });
-
-  describe('init', function () {
-    const router = { use: jest.fn(), get: jest.fn() },
-      options = {
-        router,
-        site: {
-          prefix: 'foo.com',
-          protocol: 'http',
-          port: 80
-        },
-        providers: ['apikey', 'google']
-      };
-
-    it('returns if no providers are passed in', function () {
-      expect(lib({})).toEqual([]);
+      lib.onLogout(site)({ session: { passport: { user: 'x' } }, logout: logoutOf(calls) }, createRes());
+      assert.deepEqual(calls, ['logout']);
     });
 
-    it('should set required middlewares', function () {
-      strategyService.createStrategy = jest.fn();
-      strategyService.addAuthRoutes = jest.fn();
+    it('does not log out someone who is not signed in (that would store a session)', () => {
+      const calls = [],
+        res = createRes();
 
-      lib(options);
-
-      // Should call router use 7 times to set the required middlewares
-      expect(router.use).toBeCalledTimes(7);
+      lib.onLogout(site)({ session: {}, logout: logoutOf(calls) }, res);
+      assert.deepEqual(calls, []);
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
 
-    it('should add authorization routes', function () {
-      lib(options);
+    it('goes to the login page even if logging out failed', () => {
+      const res = createRes();
 
-      expect(router.get).toBeCalledTimes(2);
-      expect(router.get).toBeCalledWith('/_auth/login', expect.any(Function));
-      expect(router.get).toBeCalledWith('/_auth/logout', expect.any(Function));
+      lib.onLogout(site)({ user: {}, session: {}, logout: callback => callback(new Error('could not save')) }, res);
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
   });
 
-  describe('addUser', function () {
-    const fn = lib[this.description];
+  describe('checkAuthentication', () => {
+    it('goes on if there is no error', () => {
+      const calls = [];
 
-    it('should add user data to the response', function () {
-      const next = jest.fn(),
-        res = { locals: { user: {} } },
-        req = { user: { username: 'foo', provider: 'bar' } };
+      lib.checkAuthentication(site)(null, {}, createRes(), () => calls.push('next'));
+      assert.deepEqual(calls, ['next']);
+    });
 
-      fn(req, res, next);
+    it('logs out and goes to the login page when there is an error (a user that was removed)', () => {
+      const calls = [],
+        res = createRes();
 
-      expect(res.locals.user).toEqual(req.user);
-      expect(next).toBeCalled();
+      lib.checkAuthentication(site)(new Error('gone'), { session: { passport: { user: 'x' } }, logout: logoutOf(calls) }, res, () => calls.push('next'));
+      assert.deepEqual(calls, ['logout']);
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
+    });
+  });
+
+  describe('addUser', () => {
+    it('puts the user in res.locals', () => {
+      const res = createRes(),
+        calls = [];
+
+      lib.addUser({ user: { username: 'foo' } }, res, () => calls.push('next'));
+      assert.deepEqual(res.locals.user, { username: 'foo' });
+      assert.deepEqual(calls, ['next']);
+    });
+  });
+
+  describe('init', () => {
+    const store = new EventEmitter();
+
+    it('does nothing without providers', () => {
+      assert.deepEqual(lib({}), []);
+      assert.deepEqual(lib({ providers: [] }), []);
+    });
+
+    it('adds the session, passport, flash and protection middleware, in that order, then the routes', () => {
+      const createStrategy = mock.method(strategyService, 'createStrategy', () => {}),
+        addAuthRoutes = mock.method(strategyService, 'addAuthRoutes', () => {}),
+        used = [],
+        got = [],
+        router = { use: (...args) => used.push(args), get: (...args) => got.push(args) },
+        providers = lib({ router, providers: ['apikey', 'google'], store, site, storage: {}, bus: {} });
+
+      assert.equal(used.length, 7);
+      assert.deepEqual(used.map(args => args.length), [1, 1, 1, 1, 1, 1, 1]);
+      assert.deepEqual(got.map(args => args[0]), ['/_auth/login', '/_auth/logout']);
+      assert.deepEqual(createStrategy.mock.calls[0].arguments, [['apikey', 'google'], site]);
+      assert.equal(addAuthRoutes.mock.callCount(), 1);
+      assert.deepEqual(providers.map(p => p.name), ['google']);
+      createStrategy.mock.restore();
+      addAuthRoutes.mock.restore();
+    });
+  });
+
+  describe('passport middleware', () => {
+    it('keeps the session id when someone signs in or out (it gets no new one)', () => {
+      const req = { session: { regenerate: () => assert.fail('regenerated') }, headers: {} },
+        used = [],
+        createStrategy = mock.method(strategyService, 'createStrategy', () => {}),
+        addAuthRoutes = mock.method(strategyService, 'addAuthRoutes', () => {});
+
+      lib({ router: { use: (...args) => used.push(args), get() {} }, providers: ['apikey'], store: new EventEmitter(), site, storage: {}, bus: {} });
+      const initialize = used[1][0];
+
+      initialize(req, createRes(), () => {});
+      let regenerated = false;
+
+      req.session.regenerate(() => { regenerated = true; });
+      assert.equal(regenerated, true);
+      createStrategy.mock.restore();
+      addAuthRoutes.mock.restore();
+    });
+
+    it('does not restore the user from a session that is not there (the session store is down)', () => {
+      const used = [],
+        createStrategy = mock.method(strategyService, 'createStrategy', () => {}),
+        addAuthRoutes = mock.method(strategyService, 'addAuthRoutes', () => {}),
+        calls = [];
+
+      lib({ router: { use: (...args) => used.push(args), get() {} }, providers: ['apikey'], store: new EventEmitter(), site, storage: {}, bus: {} });
+      used[2][0]({ headers: {} }, createRes(), error => calls.push(error));
+      assert.deepEqual(calls, [undefined]);
+      createStrategy.mock.restore();
+      addAuthRoutes.mock.restore();
     });
   });
 });

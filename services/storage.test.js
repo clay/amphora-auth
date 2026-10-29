@@ -1,71 +1,40 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`),
-  storage = require('../test/fixtures/mocks/storage');
+const { describe, it, beforeEach } = require('node:test'),
+  assert = require('node:assert/strict'),
+  storage = require('./storage');
 
-describe(_startCase(filename), function () {
-  let fakeDb;
+describe('storage', () => {
+  let calls;
 
-  beforeEach(function () {
-    fakeDb = storage();
-
-    lib.setDb(fakeDb);
-  });
-
-  describe('get', function () {
-    const fn = lib[this.description];
-
-    it('calls the get method from the db service', function () {
-      fakeDb.get.mockResolvedValue({ id: 'foo', username: 'Pizza', provider: 'google' });
-
-      return fn('foo').then(data => {
-        expect(fakeDb.get).toHaveBeenCalledWith('foo');
-        expect(data.username).toBe('Pizza');
-      });
+  beforeEach(() => {
+    calls = [];
+    storage.setDb({
+      get: (...args) => Promise.resolve(calls.push(['get', ...args]) && 'got'),
+      put: (...args) => Promise.resolve(calls.push(['put', ...args]) && 'put'),
+      del: (...args) => Promise.resolve(calls.push(['del', ...args]) && 'deleted'),
+      list: (...args) => calls.push(['list', ...args]) && 'a stream'
     });
   });
 
-  describe('put', function () {
-    const fn = lib[this.description];
-
-    it('calls the update method from the db service', function () {
-      const data = {
-        username: 'Pizza',
-        provider: 'local',
-      };
-
-      fakeDb.put.mockResolvedValue(data);
-
-      return fn('foo', data).then(result => {
-        expect(fakeDb.put).toHaveBeenCalledWith('foo', data);
-        expect(result.provider).toBe('local');
-      });
-    });
+  it('gets from the db it was given', async () => {
+    assert.equal(await storage.get('/_users/a'), 'got');
+    assert.deepEqual(calls, [['get', '/_users/a']]);
   });
 
-  describe('del', function () {
-    const fn = lib[this.description];
-
-    it('calls the delete method from the db service', function () {
-      fakeDb.del.mockResolvedValue();
-
-      return fn('foo').then(() => {
-        expect(fakeDb.del).toHaveBeenCalledWith('foo');
-      });
-    });
+  it('puts to it', async () => {
+    assert.equal(await storage.put('/_users/a', '{}'), 'put');
+    assert.deepEqual(calls, [['put', '/_users/a', '{}']]);
   });
 
-  describe('list', function () {
-    const fn = lib[this.description];
+  it('deletes from it', async () => {
+    assert.equal(await storage.del('/_users/a'), 'deleted');
+    assert.deepEqual(calls, [['del', '/_users/a']]);
+  });
 
-    it('calls the list method from the db service', function () {
-      fakeDb.list = jest.fn().mockResolvedValue();
-
-      return fn().then(() => {
-        expect(fakeDb.list).toHaveBeenCalledWith({});
-      });
-    });
+  it('lists from it, with options or without', () => {
+    assert.equal(storage.list({ prefix: '/_users/' }), 'a stream');
+    storage.list();
+    assert.deepEqual(calls, [['list', { prefix: '/_users/' }], ['list', {}]]);
   });
 });

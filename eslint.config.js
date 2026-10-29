@@ -71,8 +71,13 @@ module.exports = [
     }
   },
   {
-    // tests (still Jest here): globals for the runner
+    // node:test and node:assert are required in the test files; describe/it nest deeper than the callback limit
     files: ['**/*.test.js', 'test/**/*.js'],
-    languageOptions: { globals: { ...globals.node, ...globals.jest } }
+    rules: { complexity: 'off', 'max-nested-callbacks': 'off', 'one-var': 'off' }
+  },
+  {
+    // a compact fake server, not written in the style of the package
+    files: ['test/helpers/resp-server.js'],
+    rules: { 'no-extra-parens': 'off', 'no-nested-ternary': 'off', 'newline-after-var': 'off' }
   }
 ];

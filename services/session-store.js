@@ -1,7 +1,8 @@
 'use strict';
 
 let session = require('express-session'),
-  redisStore; // the store made here, shared by every site that doesn't bring its own
+  redisStore, // the store made here, shared by every site that doesn't bring its own
+  redisClient; // and its connection
 
 const { isEmpty } = require('../lib/helpers'),
   { SECRET } = require('../constants'),
@@ -18,6 +19,8 @@ function createRedisStore() {
     { RedisStore } = require('connect-redis'),
     client = new Redis(REDIS_SESSION_HOST),
     store = new RedisStore({ client, prefix: sessionPrefix });
+
+  redisClient = client;
 
   // express-session stops using a store that says it is disconnected (requests go on without a session)
   // and starts again when it says it is connected, so Redis going down doesn't hold requests up
@@ -61,4 +64,5 @@ module.exports = createSessionStore;
 
 // For testing purposes
 module.exports.setSession = mock => session = mock;
-module.exports.resetRedisStore = () => redisStore = undefined;
+module.exports.getRedisStore = () => redisStore;
+module.exports.getRedisClient = () => redisClient;

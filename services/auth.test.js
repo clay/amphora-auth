@@ -1,89 +1,66 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+const { describe, it } = require('node:test'),
+  assert = require('node:assert/strict'),
+  { createRes } = require('../test/helpers/mocks'),
+  { withAuthLevel, checkAuthLevel, unauthorized } = require('./auth');
 
-describe(_startCase(filename), function () {
-  let mockRes;
+describe('auth', () => {
+  describe('unauthorized', () => {
+    it('answers 401 with a json message', () => {
+      const res = createRes();
 
-  beforeEach(function () {
-    mockRes = {
-      status: jest.fn().mockReturnThis(),
-      json: jest.fn(),
-    };
-  });
-
-  describe('unauthorized', function () {
-    const fn = lib[this.description];
-
-    it('should set status code as 401', function () {
-      fn(mockRes);
-
-      expect(mockRes.status).toHaveBeenCalledWith(401);
-    });
-
-    it('should send a json error message', function () {
-      fn(mockRes);
-
-      expect(mockRes.json).toHaveBeenCalledWith({ code: 401, message: 'Unauthorized request' });
+      unauthorized(res);
+      assert.deepEqual(res.calls, [['status', 401], ['json', { code: 401, message: 'Unauthorized request' }]]);
     });
   });
 
-  describe('checkAuthLevel', function () {
-    const fn = lib[this.description];
-
-    it('should throw an error if userLevel is not set', function () {
-      const cb = () => fn();
-
-      expect(cb).toThrow();
+  describe('checkAuthLevel', () => {
+    it('throws if the user has no level', () => {
+      assert.throws(() => checkAuthLevel(), { message: 'User does not have an authentication level set' });
+      assert.throws(() => checkAuthLevel(''), { message: 'User does not have an authentication level set' });
+      assert.throws(() => checkAuthLevel(null, 'write'), { message: 'User does not have an authentication level set' });
     });
 
-    it('should return true if userLevel is admin', function () {
-      expect(fn('admin')).toBeTruthy();
+    it('lets an admin do anything', () => {
+      assert.equal(checkAuthLevel('admin'), true);
+      assert.equal(checkAuthLevel('admin', 'write'), true);
     });
 
-    it('should return true if userLevel and requiredLevel match', function () {
-      expect(fn('write', 'write')).toBeTruthy();
+    it('lets a user do what is of their level', () => {
+      assert.equal(checkAuthLevel('write', 'write'), true);
     });
 
-    it('should return false if userLevel and requiredLevel do not match', function () {
-      expect(fn('write', 'admin')).toBeFalsy();
+    it('does not let a user do what is of another level', () => {
+      assert.equal(checkAuthLevel('write', 'admin'), false);
+      assert.equal(checkAuthLevel('ADMIN', 'admin'), false);
     });
   });
 
-  describe('withAuthLevel', function () {
-    const fn = lib[this.description],
-      reqObj = {
-        user: {
-          auth: 'write'
-        }
-      };
+  describe('withAuthLevel', () => {
+    it('goes on if the user has the level', () => {
+      const calls = [],
+        res = createRes();
 
-    lib.unauthorized = jest.fn();
-
-    it('throws an error if userLevel is undefined', function () {
-      const next = jest.fn(),
-        cb = () => fn('admin')({}, {}, next);
-
-      expect(cb).toThrow();
+      withAuthLevel('write')({ user: { auth: 'write' } }, res, () => calls.push('next'));
+      withAuthLevel('write')({ user: { auth: 'admin' } }, res, () => calls.push('next'));
+      assert.deepEqual(calls, ['next', 'next']);
+      assert.deepEqual(res.calls, []);
     });
 
-    it('sends unauthorized response if user does not have proper permissions', function () {
-      const next = jest.fn();
+    it('answers 401 if the user lacks the level', () => {
+      const calls = [],
+        res = createRes();
 
-      fn('admin')(reqObj, mockRes, next);
-      expect(next).not.toBeCalled();
-      expect(mockRes.status).toBeCalledWith(401);
-      expect(mockRes.json).toBeCalled();
+      withAuthLevel('admin')({ user: { auth: 'write' } }, res, () => calls.push('next'));
+      assert.deepEqual(calls, []);
+      assert.deepEqual(res.calls, [['status', 401], ['json', { code: 401, message: 'Unauthorized request' }]]);
     });
 
-    it('calls next if the user has the appropriate level', function () {
-      const next = jest.fn();
-
-      fn('write')(reqObj, mockRes, next);
-      expect(next).toBeCalled();
-      expect(lib.unauthorized).not.toBeCalled();
+    it('throws if there is no user, or the user has no level', () => {
+      [undefined, {}, { user: null }, { user: {} }, { user: { auth: null } }, { user: { auth: 0 } }].forEach(req => {
+        assert.throws(() => withAuthLevel('admin')(req, createRes(), () => {}), { message: 'User does not have an authentication level set' }, JSON.stringify(req));
+      });
     });
   });
 });

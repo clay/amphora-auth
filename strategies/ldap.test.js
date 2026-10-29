@@ -1,107 +1,62 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  _includes = require('lodash/includes'),
-  _noop = require('lodash/noop'),
+const { describe, it, mock } = require('node:test'),
+  assert = require('node:assert/strict'),
   passport = require('passport'),
+  { createRes } = require('../test/helpers/mocks'),
   utils = require('../utils'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+  ldap = require('./ldap'),
+  site = { slug: 'site', prefix: 'foo.com', protocol: 'http', port: 80, path: '/' };
 
-describe(_startCase(filename), function () {
-  describe('verifyLdap', function () {
-    const fn = lib[this.description];
+describe('ldap strategy', () => {
+  it('registers a strategy that looks credentials up in the Basic header', () => {
+    const use = mock.method(passport, 'use', () => {});
 
-    it('calls verify with a slightly different function signature', function (done) {
-      utils.verify = jest.fn(() => (req, token, tokenSecret, profile, cb) => cb()) // eslint-disable-line
+    Object.assign(process.env, { LDAP_URL: 'ldap://localhost:389', LDAP_BIND_DN: 'cn=x', LDAP_BIND_CREDENTIALS: 'pw', LDAP_SEARCH_BASE: 'dc=x', LDAP_SEARCH_FILTER: '(uid={{username}})' });
+    ldap(site);
+    assert.equal(use.mock.calls[0].arguments[0], 'ldap-site');
+    const strategy = use.mock.calls[0].arguments[1];
 
-      process.env.LDAP_URL = 'http://foo.bar';
-      process.env.LDAP_BIND_DN = '123';
-      process.env.LDAP_BIND_CREDENTIALS = '456';
-
-      fn({})({}, {}, function () {
-        expect(utils.verify).toBeCalled();
-        done();
-      });
-    });
+    assert.equal(strategy.name, 'ldapauth');
+    assert.deepEqual(strategy.options.credentialsLookup({ headers: { authorization: `Basic ${Buffer.from('user:pass').toString('base64')}` } }), { name: 'user', pass: 'pass' });
+    use.mock.restore();
   });
 
-  describe('createLDAPStrategy', function () {
-    const siteStub = { slug: 'foo' };
+  it('verifies with the sAMAccountName and displayName of the user', () => {
+    const verify = mock.method(utils, 'verify', () => (...args) => args[4](null, args[3])),
+      results = [];
 
-    it('creates ldap strategy', function () {
-      passport.use = jest.fn();
-
-      lib(siteStub);
-
-      expect(passport.use).toBeCalled();
-    });
+    ldap.verifyLdap()({}, { sAMAccountName: 'ann', displayName: 'Ann' }, (...args) => results.push(args));
+    assert.deepEqual(verify.mock.calls[0].arguments[0], { username: 'sAMAccountName', imageUrl: '', name: 'displayName', provider: 'ldap' });
+    assert.deepEqual(results, [[null, { sAMAccountName: 'ann', displayName: 'Ann' }]]);
+    verify.mock.restore();
   });
 
-  describe('addAuthRoutes', function () {
-    const fn = lib[this.description],
-      paths = [],
-      router = {
-        get: function (path) {
-          // testing if the paths are added,
-          // we're checking the paths array after each test
-          paths.push(path);
-        }
-      };
+  it('asks for a username and password the browser can show, when there are none', () => {
+    const res = createRes(),
+      calls = [];
 
-    it('adds ldap auth and callback routes', function () {
-      fn(router, {}, 'ldap');
-      expect(_includes(paths, '/_auth/ldap')).toEqual(true);
-    });
+    ldap.checkCredentials({ headers: {} }, res, () => calls.push('next'));
+    assert.deepEqual(calls, []);
+    assert.equal(res.statusCode, 401);
+    assert.deepEqual(res.calls, [['setHeader', 'WWW-Authenticate', 'Basic'], ['end', 'Access denied']]);
   });
 
-  describe('rejectBasicAuth', function () {
-    const fn = lib[this.description];
+  it('goes on when there are credentials', () => {
+    const calls = [];
 
-    it('sets status code to 401', function () {
-      const res = { setHeader: _noop, end: _noop };
-
-      fn(res);
-      expect(res.statusCode).toEqual(401);
-    });
-
-    it('sets authentication header', function () {
-      const res = { setHeader: jest.fn(), end: _noop };
-
-      fn(res);
-      expect(res.setHeader).toBeCalledWith('WWW-Authenticate', 'Basic');
-    });
-
-    it('calls res.end()', function () {
-      const res = { setHeader: _noop, end: jest.fn() };
-
-      fn(res);
-      expect(res.end).toBeCalledWith('Access denied');
-    });
+    ldap.checkCredentials({ headers: { authorization: 'basic Zm9vOmJhcg==' } }, createRes(), () => calls.push('next'));
+    assert.deepEqual(calls, ['next']);
   });
 
-  describe('checkCredentials', function () {
-    const fn = lib[this.description];
+  it('adds a route that wants credentials, and goes back to the login page when they fail', () => {
+    const routes = [],
+      authenticate = mock.method(passport, 'authenticate', (...args) => args);
 
-    it('rejects synchronously if no credentials found', function () {
-      const res = { setHeader: _noop, end: jest.fn() };
-
-      fn({ headers: {}}, res, _noop);
-      expect(res.end).toBeCalled();
-    });
-
-    function request(authorization) {
-      return {
-        headers: {
-          authorization: authorization
-        }
-      };
-    }
-
-    it('passes through if credentials exist', function (done) {
-      const req = request('basic Zm9vOmJhcg==');
-
-      fn(req, {}, done); // expect done to be called
-    });
+    ldap.addAuthRoutes({ get: (...args) => routes.push(args) }, site, 'ldap');
+    assert.equal(routes[0][0], '/_auth/ldap');
+    assert.equal(routes[0][1], ldap.checkCredentials);
+    assert.deepEqual(routes[0][2], ['ldap-site', { failureRedirect: 'http://foo.com/_auth/login', failureFlash: true, successReturnToOrRedirect: '/' }]);
+    authenticate.mock.restore();
   });
 });

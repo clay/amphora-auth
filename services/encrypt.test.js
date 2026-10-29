@@ -1,53 +1,65 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  bcrypt = require('bcryptjs'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`);
+const { describe, it } = require('node:test'),
+  assert = require('node:assert/strict'),
+  { hashPassword, isValidPassword } = require('./encrypt'),
+  // hashes of 'secret', made by bcryptjs 2.4.3 (what was stored before this package used bcryptjs 3)
+  stored = {
+    cost4: '$2a$04$ZvyKzz6rDfXPbq1rtLgIgeodWAWrfMS8w5xKBLSkNlMk4rBa5aZlO',
+    cost10: '$2a$10$oLIcSx20PswGYfcIareE2OY4CMjmFgKv0j7Im4NDTJG/o4N1IC8EC'
+  };
 
-describe(_startCase(filename), function () {
-  describe('hashPassword', function () {
-    const fn = lib[this.description];
+describe('encrypt', () => {
+  describe('hashPassword', () => {
+    it('makes a bcrypt hash with the $2a$ prefix and a cost of 10', () => {
+      const hash = hashPassword('secret');
 
-    it('should create a hash given a password', function () {
-      bcrypt.hashSync = jest.fn().mockReturnValue('foo123bar456');
-      bcrypt.genSaltSync = jest.fn().mockReturnValue('r4nd0ms41th4sh');
-
-      const result = fn('foobar');
-
-      expect(bcrypt.hashSync).toHaveBeenCalledWith('foobar', 'r4nd0ms41th4sh');
-      expect(result).toBe('foo123bar456');
+      assert.match(hash, /^\$2a\$10\$[./A-Za-z0-9]{53}$/);
     });
 
-    it('should throw an error if no password if passed', function () {
-      bcrypt.hashSync = jest.fn().mockImplementation(() => { throw new Error(); });
-      const cb = () => fn();
+    it('makes a different hash every time, that all check out', () => {
+      const a = hashPassword('secret'),
+        b = hashPassword('secret');
 
-      expect(cb).toThrow();
+      assert.notEqual(a, b);
+      assert.equal(isValidPassword({ password: a }, 'secret'), true);
+      assert.equal(isValidPassword({ password: b }, 'secret'), true);
+    });
+
+    it('throws for what is not a string', () => {
+      assert.throws(() => hashPassword(), { message: /Illegal arguments/ });
+    });
+
+    it('hashes and checks a password that is a lone surrogate', () => {
+      const start = Date.now(),
+        hash = hashPassword('\ud83d');
+
+      assert.equal(isValidPassword({ password: hash }, '\ud83d'), true);
+      assert.ok(Date.now() - start < 2000);
     });
   });
 
-  describe('isValidPassword', function () {
-    const fn = lib[this.description];
-
-    it('should return true if valid password', function () {
-      bcrypt.compareSync = jest.fn().mockReturnValue(true);
-
-      const user = { password: 'foo123bar456' },
-        result = fn(user, 'foobar');
-
-      expect(bcrypt.compareSync).toHaveBeenCalledWith('foobar', user.password);
-      expect(result).toBeTruthy();
+  describe('isValidPassword', () => {
+    it('checks the hashes that are already stored', () => {
+      assert.equal(isValidPassword({ password: stored.cost4 }, 'secret'), true);
+      assert.equal(isValidPassword({ password: stored.cost10 }, 'secret'), true);
+      assert.equal(isValidPassword({ password: stored.cost10 }, 'Secret'), false);
+      assert.equal(isValidPassword({ password: stored.cost10 }, ''), false);
     });
 
-    it('should return false if invalid password', function () {
-      bcrypt.compareSync = jest.fn().mockReturnValue(false);
+    it('checks the same hash under the other $2 prefixes', () => {
+      ['$2a$', '$2b$', '$2y$'].forEach(prefix => {
+        assert.equal(isValidPassword({ password: prefix + stored.cost4.slice(4) }, 'secret'), true, prefix);
+      });
+    });
 
-      const user = { password: 'foo123bar456' },
-        result = fn(user, 'foobaz');
+    it('is false for something that is not a hash', () => {
+      assert.equal(isValidPassword({ password: 'notahash' }, 'secret'), false);
+      assert.equal(isValidPassword({ password: '' }, 'secret'), false);
+    });
 
-      expect(bcrypt.compareSync).toHaveBeenCalledWith('foobaz', user.password);
-      expect(result).toBeFalsy();
+    it('throws if there is no hash', () => {
+      assert.throws(() => isValidPassword({}, 'secret'), { message: /Illegal arguments/ });
     });
   });
 });

@@ -1,466 +1,324 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  bluebird = require('bluebird'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`),
-  createMockRes = require('../test/fixtures/mocks/res'),
-  storage = require('../test/fixtures/mocks/storage');
+const { describe, it, beforeEach } = require('node:test'),
+  assert = require('node:assert/strict'),
+  { createRes, createStorage } = require('../test/helpers/mocks'),
+  { Writable } = require('stream'),
+  responses = require('./responses'),
+  tick = () => new Promise(resolve => setImmediate(resolve)),
+  jsonBody = (code, message) => [['status', code], ['format', 'default,html,json,text'], ['json', { message, code }]];
 
-describe(_startCase(filename), function () {
-  let fakeLog,
-    fakeDb,
-    mockRes;
+describe('responses', () => {
+  let logs;
 
-  beforeEach(function () {
-    fakeLog = jest.fn();
-    fakeDb = storage();
-    mockRes = createMockRes();
-    mockRes.status = jest.fn().mockReturnThis();
-
-    lib.setLog(fakeLog);
-    lib.setDb(fakeDb);
+  beforeEach(() => {
+    logs = [];
+    responses.setLog((...args) => logs.push(args));
   });
 
-  /**
-   * Shortcut
-   *
-   * @param {object} res
-   * @param {object} expected
-   * @param {Function} done
-   */
-  function expectResult(res, expected, done) {
-    jest.spyOn(res, 'send')
-      .mockImplementation(function (result) {
-        expect(result).toEqual(expected);
-        done();
-      });
-  }
+  describe('handleError', () => {
+    it('answers 404 for a "not found" and does not log it', () => {
+      const res = createRes('json');
 
-  describe('handleError', function () {
-    const fn = lib[this.description];
-
-    it('should send 404 if "not found"', function (done) {
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).not.toBeCalled();
-        expect(mockRes.status).toBeCalledWith(404);
-        done();
-      });
-      fn(mockRes)(new Error('not found'));
+      responses.handleError(res)(new Error('not found'));
+      assert.deepEqual(res.calls, jsonBody(404, 'not found'));
+      assert.deepEqual(logs, []);
     });
 
-    it('sends 500 and logs error', function (done) {
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', 'something', expect.any(Object));
-        expect(mockRes.status).toBeCalledWith(500);
-        done();
-      });
-      fn(mockRes)(new Error('something'));
+    it('answers 404 for ENOENT, and for NotFoundError', () => {
+      const a = createRes('json'),
+        b = createRes('json');
+
+      responses.handleError(a)(new Error('ENOENT: no such file'));
+      responses.handleError(b)(Object.assign(new Error('x'), { name: 'NotFoundError' }));
+      assert.deepEqual(a.calls, jsonBody(404, 'ENOENT: no such file'));
+      assert.deepEqual(b.calls, jsonBody(404, 'x'));
     });
 
-    it('sends the error code defined in the `status` property', function (done) {
-      const myError = new Error('something');
+    it('answers with the status of the error, when it has one', () => {
+      const res = createRes('json');
 
-      myError.status = 403;
-
-      expectResult(mockRes, 'sendStatus: whatever', done);
-      fn(mockRes)(myError);
-      expect(mockRes.status).toBeCalledWith(403);
+      responses.handleError(res)(Object.assign(new Error('forbidden'), { status: 403 }));
+      assert.deepEqual(res.calls, jsonBody(403, 'forbidden'));
+      assert.deepEqual(logs, []);
     });
 
-    it('sends 400 and logs the error', function (done) {
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', 'something Client', expect.any(Object));
-        expect(mockRes.status).toBeCalledWith(400);
-        done();
-      });
-      fn(mockRes)(new Error('something Client'));
-    });
-  });
+    it('answers 404 for a NotFoundError even if it has a status', () => {
+      const res = createRes('json');
 
-  describe('expectJSON', function () {
-    const fn = lib[this.description];
-
-    it('sends json', function (done) {
-      const data = {},
-        res = createMockRes({ formatter: 'json' });
-
-      res.status = jest.fn().mockReturnThis();
-
-      expectResult(res, data, function () {
-        expect(fakeLog).not.toBeCalled();
-        done();
-      });
-      fn(function () {
-        return data;
-      }, res);
+      responses.handleError(res)(Object.assign(new Error('gone'), { status: 500, name: 'NotFoundError' }));
+      assert.deepEqual(res.calls, jsonBody(404, 'gone'));
     });
 
-    it('404s on Error "not found"', function (done) {
-      const res = createMockRes({ formatter: 'json' });
+    it('answers 400 and logs when the message says it is the client', () => {
+      const res = createRes('json'),
+        error = new Error('something Client');
 
-      res.status = jest.fn().mockReturnThis();
+      responses.handleError(res)(error);
+      assert.deepEqual(res.calls, jsonBody(400, 'something Client'));
+      assert.deepEqual(logs, [['error', 'something Client', { error }]]);
+    });
 
-      expectResult(res, {
-        message: 'not found',
-        code: 404
-      }, function () {
-        expect(fakeLog).not.toBeCalled();
-        expect(res.status).toBeCalledWith(404);
-        done();
+    it('answers 500 and logs the error otherwise', () => {
+      const res = createRes('json'),
+        error = new Error('boom');
+
+      responses.handleError(res)(error);
+      assert.deepEqual(res.calls, jsonBody(500, 'boom'));
+      assert.deepEqual(logs, [['error', 'boom', { error }]]);
+    });
+
+    it('answers 500 for something that is not an Error', () => {
+      [undefined, null, 'a string', {}, 42].forEach(thrown => {
+        const res = createRes('json');
+
+        responses.handleError(res)(thrown);
+        assert.equal(res.calls[0][1], 500, String(thrown));
       });
-      fn(function () {
-        throw Error('not found');
-      }, res);
+      assert.equal(logs.length, 5);
+      assert.equal(logs[2][1], 'a string');
+    });
+
+    it('answers in the format that was asked for', () => {
+      const error = new Error('boom'),
+        html = createRes('html'),
+        text = createRes('text'),
+        other = createRes('default');
+
+      responses.handleError(html)(error);
+      responses.handleError(text)(error);
+      responses.handleError(other)(error);
+      assert.deepEqual(html.calls.slice(2), [['type', 'html'], ['send', '500 boom']]);
+      assert.deepEqual(text.calls.slice(2), [['type', 'text'], ['send', '500 boom']]);
+      assert.deepEqual(other.calls.slice(2), [['sendStatus', 500]]);
     });
   });
 
-  describe('clientError', function () {
-    const fn = lib[this.description];
+  describe('clientError and serverError', () => {
+    it('log the error under the error key and say 400 and 500', () => {
+      const client = createRes('json'),
+        server = createRes('json'),
+        error = new Error('x');
 
-    it('sends 400', function (done) {
+      responses.clientError(error, client);
+      responses.serverError(error, server);
+      assert.deepEqual(client.calls, jsonBody(400, 'x'));
+      assert.deepEqual(server.calls, jsonBody(500, 'x'));
+      assert.deepEqual(logs, [['error', 'x', { error }], ['error', 'x', { error }]]);
+    });
 
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', 'something', expect.any(Object));
-        expect(mockRes.status).toBeCalledWith(400);
-        done();
-      });
-      fn(new Error('something'), mockRes);
+    it('give a message to log and to answer when the error has none', () => {
+      const client = createRes('json'),
+        server = createRes('json');
+
+      responses.clientError(new Error(''), client);
+      responses.serverError(new Error(''), server);
+      assert.equal(logs[0][1], 'Client Error');
+      assert.equal(logs[1][1], 'Server Error');
+      assert.deepEqual(server.calls, jsonBody(500, 'Server Error'));
+    });
+
+    it('take what comes after a colon as the message to the client', () => {
+      const res = createRes('json');
+
+      responses.clientError(new Error('Client: the part to show'), res);
+      assert.deepEqual(res.calls, jsonBody(400, 'the part to show'));
     });
   });
 
-  describe('serverError', function () {
-    const fn = lib[this.description];
+  describe('expectJSON', () => {
+    it('sends what the function gives', async () => {
+      const a = createRes('json'),
+        b = createRes('json');
 
-    it('sends 500 and logs error', function (done) {
-
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', 'something', expect.any(Object));
-        expect(mockRes.status).toBeCalledWith(500);
-        done();
-      });
-      fn(new Error('something'), mockRes);
+      responses.expectJSON(() => ({ a: 1 }), a);
+      responses.expectJSON(() => Promise.resolve({ b: 2 }), b);
+      await tick();
+      assert.deepEqual(a.calls, [['json', { a: 1 }]]);
+      assert.deepEqual(b.calls, [['json', { b: 2 }]]);
     });
 
-    it('returns "Server Error" message', function (done) {
-      let err = new Error('something');
+    it('runs the function at once', () => {
+      let ran = false;
 
-      // Reset the error message to test for default response
-      err.message = '';
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).toBeCalledWith('error', 'Server Error', { error: err });
-        expect(mockRes.status).toBeCalledWith(500);
-        done();
-      });
-      fn(err, mockRes);
-    });
-  });
-
-  describe('varyWithoutExtension', function () {
-    const fn = lib[this.description];
-
-    it('adds vary without extension', function (done) {
-      const req = {
-          path: '/hey',
-          baseUrl: '/foo',
-          url: ''
-        },
-        res = createMockRes();
-
-      res.set = jest.fn();
-
-      fn({ varyBy: ['whatever'] })(req, res, function () {
-        expect(fakeLog).not.toBeCalled();
-        expect(res.set).toBeCalledWith('Vary', 'whatever');
-        done();
-      });
+      responses.expectJSON(() => { ran = true; }, createRes('json'));
+      assert.equal(ran, true);
     });
 
-    it('does not add vary with extension', function (done) {
-      const req = {
-          path: '/hey.html',
-          baseUrl: '/foo',
-          url: ''
-        },
-        res = createMockRes();
+    it('answers an error that is thrown, or rejected', async () => {
+      const thrown = createRes('json'),
+        rejected = createRes('json');
 
-      res.set = jest.fn();
+      responses.expectJSON(() => { throw new Error('not found'); }, thrown);
+      responses.expectJSON(() => Promise.reject(new Error('db down')), rejected);
+      await tick();
+      assert.deepEqual(thrown.calls, jsonBody(404, 'not found'));
+      assert.deepEqual(rejected.calls, jsonBody(500, 'db down'));
+    });
 
-      fn({ varyBy: ['whatever'] })(req, res, function () {
-        expect(fakeLog).not.toBeCalled();
-        expect(res.set).not.toBeCalledWith('Vary', 'whatever');
-        done();
-      });
+    it('answers something that is thrown or rejected that is not an Error', async () => {
+      const a = createRes('json'),
+        b = createRes('json'),
+        c = createRes('json');
+
+      responses.expectJSON(() => Promise.reject('str'), a);
+      responses.expectJSON(() => Promise.reject(), b);
+      responses.expectJSON(() => { throw 'x'; }, c); // eslint-disable-line no-throw-literal
+      await tick();
+      assert.deepEqual([a, b, c].map(res => res.calls[0]), [['status', 500], ['status', 500], ['status', 500]]);
     });
   });
 
-  describe('methodNotAllowed', function () {
-    const fn = lib[this.description];
+  describe('varyWithoutExtension', () => {
+    it('adds Vary when the path has no extension', () => {
+      const res = createRes(),
+        calls = [];
 
-    it('blocks when not allowed', function (done) {
-      const allowed = ['something'],
-        req = { method: 'somethingElse' },
-        res = createMockRes({ formatter: 'json' });
-
-      res.status = jest.fn().mockReturnThis();
-
-      expectResult(res, {
-        allow: allowed,
-        code: 405,
-        message: 'Method somethingElse not allowed'
-      }, function () {
-        expect(fakeLog).not.toBeCalled();
-        expect(res.status).toBeCalledWith(405);
-        done();
-      });
-      fn({ allow: allowed })(req, res);
+      responses.varyWithoutExtension({ varyBy: ['Accept', 'X'] })({ baseUrl: '/foo', path: '/hey' }, res, () => calls.push('next'));
+      assert.deepEqual(res.calls, [['set', 'Vary', 'Accept, X']]);
+      assert.deepEqual(calls, ['next']);
     });
 
-    it('does not block when allowed', function (done) {
-      const req = { method: 'something' },
-        res = createMockRes({ formatter: 'json' });
+    it('does not when it has one', () => {
+      const res = createRes();
 
-      res.status = jest.fn().mockReturnThis();
-
-      fn({ allow: ['something'] })(req, res, function () {
-        expect(fakeLog).not.toBeCalled();
-        done();
-      });
+      responses.varyWithoutExtension({ varyBy: ['Accept'] })({ baseUrl: '/foo', path: '/hey.html' }, res, () => {});
+      assert.deepEqual(res.calls, []);
     });
   });
 
-  describe('denyReferenceAtRoot', function () {
-    const fn = lib[this.description];
+  describe('methodNotAllowed', () => {
+    it('lets an allowed method through, in any case', () => {
+      const calls = [];
 
-    it('should block if _ref is at root of body', function (done) {
-      const req = {
-        body: { _ref: 'foo' }
-      };
-
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(mockRes.status).toBeCalledWith(400);
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.methodNotAllowed({ allow: ['get', 'post'] })({ method: 'GET' }, createRes(), () => calls.push('GET'));
+      responses.methodNotAllowed({ allow: ['get', 'post'] })({ method: 'post' }, createRes(), () => calls.push('post'));
+      assert.deepEqual(calls, ['GET', 'post']);
     });
 
-    it('should not block if there is no _ref at root of body', function (done) {
-      const req = { body: {} };
+    it('answers 405 with what is allowed otherwise', () => {
+      const res = createRes('json'),
+        calls = [];
 
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.methodNotAllowed({ allow: ['get', 'post'] })({ method: 'PATCH' }, res, () => calls.push('next'));
+      assert.deepEqual(calls, []);
+      assert.deepEqual(res.calls, [['set', 'Allow', 'GET, POST'], ['status', 405], ['format', 'default,html,json,text'], ['json', { allow: ['get', 'post'], message: 'Method PATCH not allowed', code: 405 }]]);
     });
   });
 
-  describe('denyTrailingSlashOnId', function () {
-    const fn = lib[this.description];
+  describe('notAcceptable and acceptJSONOnly', () => {
+    it('let through what is acceptable', () => {
+      const calls = [];
 
-    it('should deny if there is slash after path', function (done) {
-      const req = { path: '/foo/' };
-
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(mockRes.status).toBeCalledWith(400);
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.notAcceptable({ accept: ['application/json'] })({ accepts: () => 'application/json' }, createRes(), () => calls.push('a'));
+      responses.acceptJSONOnly({ accepts: () => 'json' }, createRes(), () => calls.push('b'));
+      assert.deepEqual(calls, ['a', 'b']);
     });
 
-    it('should allow if there is no slash after path', function (done) {
-      const req = { path: '/foo' };
+    it('answer 406 for what is not', () => {
+      const a = createRes('json'),
+        b = createRes('json');
 
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(fakeLog).not.toBeCalled();
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.notAcceptable({ accept: ['application/json'] })({ accepts: () => false, get: () => 'text/xml' }, a, () => assert.fail('next'));
+      responses.acceptJSONOnly({ accepts: () => false, get: () => 'text/xml' }, b, () => assert.fail('next'));
+      assert.deepEqual(a.calls[0], ['set', 'Accept', 'application/json']);
+      assert.deepEqual(a.calls.slice(1), [['status', 406], ['format', 'default,html,json,text'], ['json', { accept: ['application/json'], message: 'text/xml not acceptable', code: 406 }]]);
+      assert.equal(b.calls[1][1], 406);
     });
   });
 
-  describe('listUsers', function () {
-    const fn = lib[this.description],
-      expected = [
-        '/_users/a',
-        '/_users/aa',
-        '/_users/aaa',
-        '/_users/c',
-        '/_users/cc',
-        '/_users/ccc',
-        '/_users/e'
-      ];
+  describe('denyReferenceAtRoot', () => {
+    it('answers 400 for a _ref at the root of the body', () => {
+      const res = createRes('json');
 
-    beforeEach(function () {
-      return fakeDb.clearMem().then(function () {
-        return bluebird.join(
-          fakeDb.writeToInMem('/_users/a', 'b'),
-          fakeDb.writeToInMem('/_users/aa', 'b'),
-          fakeDb.writeToInMem('/_users/aaa', 'b'),
-          fakeDb.writeToInMem('/_users/c', 'd'),
-          fakeDb.writeToInMem('/_users/cc', 'd'),
-          fakeDb.writeToInMem('/_users/ccc', 'd'),
-          fakeDb.writeToInMem('/_users/e', 'f')
-        );
-      });
+      responses.denyReferenceAtRoot({ body: { _ref: 'x' } }, res, () => assert.fail('next'));
+      assert.deepEqual(res.calls, jsonBody(400, 'Reference (_ref) at root of object is not acceptable'));
     });
 
-    afterEach(function () {
-      return fakeDb.clearMem();
-    });
+    it('goes on otherwise', () => {
+      const calls = [];
 
-    it('lists users under a domain', function (done) {
-      const req = {
-        hostname: 'base.com',
-        baseUrl: '',
-        path: '/_users/'
-      };
-
-      expectResult(mockRes, JSON.stringify(expected.map(user => `${req.hostname}${user}`)), function () {
-        expect(fakeLog).not.toBeCalled();
-        done();
-      });
-      fn()(req, mockRes);
-    });
-
-    it('lists users under a domain with a path', function (done) {
-      const req = {
-        hostname: 'base.com',
-        baseUrl: '',
-        path: '/some/path/_users/'
-      };
-
-      expectResult(mockRes, JSON.stringify(expected.map(user => `${req.hostname}/some/path${user}`)), function () {
-        expect(fakeLog).not.toBeCalled();
-        done();
-      });
-      fn()(req, mockRes);
+      [{}, { a: { _ref: 1 } }, undefined, null, 'str', []].forEach(body => responses.denyReferenceAtRoot({ body }, createRes(), () => calls.push('next')));
+      assert.equal(calls.length, 6);
     });
   });
 
-  describe('getRouteFromDB', function () {
-    const fn = lib[this.description];
+  describe('denyTrailingSlashOnId', () => {
+    it('answers 400 for a slash at the end', () => {
+      const res = createRes('json');
 
-    afterEach(function () {
-      return fakeDb.clearMem();
+      responses.denyTrailingSlashOnId({ path: '/foo/' }, res, () => assert.fail('next'));
+      assert.deepEqual(res.calls, jsonBody(400, 'Trailing slash on RESTful id in URL is not acceptable'));
     });
 
-    it('should get users data from a uri', function (done) {
-      const req = { uri: '/_users/a' },
-        mockData = {
-          username: 'foo',
-          provider: 'bar',
-          auth: 'baz'
-        };
+    it('goes on otherwise', () => {
+      const calls = [];
 
-      fakeDb.get.mockResolvedValue(mockData);
-
-      fn(req, mockRes);
-
-      expect(fakeDb.get).toBeCalledWith(req.uri);
-      done();
+      ['/foo', '', '/a/b'].forEach(path => responses.denyTrailingSlashOnId({ path }, createRes(), () => calls.push('next')));
+      assert.equal(calls.length, 3);
     });
   });
 
-  describe('acceptJSONOnly', function () {
-    const fn = lib[this.description],
-      req = {
-        accepts: jest.fn(),
-        get: jest.fn()
-      };
+  describe('getRouteFromDB', () => {
+    it('sends the user without the password', async () => {
+      const res = createRes('json');
 
-    it('should block if accepts header is not set', function (done) {
-      req.accepts.mockReturnValue(false);
-
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(mockRes.status).toBeCalledWith(406);
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.setDb(createStorage({ '/_users/a': { username: 'a', password: 'hash', auth: 'admin' } }));
+      responses.getRouteFromDB({ uri: '/_users/a' }, res);
+      await tick();
+      assert.deepEqual(res.calls, [['json', { username: 'a', auth: 'admin' }]]);
     });
 
-    it('should not block if accepts header is set to json', function (done) {
-      req.accepts.mockReturnValue(true);
+    it('answers 404 for a user that is not there', async () => {
+      const res = createRes('json');
 
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        done();
-      });
-      fn(req, mockRes, done);
-    });
-
-    it('should accept matched type', function (done) {
-      req.accepts.mockReturnValueOnce(false);
-      req.accepts.mockRejectedValueOnce(true);
-
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        done();
-      });
-      fn(req, mockRes, done);
+      responses.setDb(createStorage());
+      responses.getRouteFromDB({ uri: '/_users/nope' }, res);
+      await tick();
+      assert.deepEqual(res.calls, jsonBody(404, 'not found'));
     });
   });
 
-  describe('sendTextErrorCode', function () {
-    const fn = lib[this.description];
+  describe('listUsers', () => {
+    const response = () => {
+      const chunks = [],
+        res = new Writable({ write(chunk, encoding, cb) { chunks.push(chunk.toString()); cb(); } });
 
-    it('should send error message as text', function (done) {
-      mockRes.type = jest.fn();
+      res.set = (...args) => chunks.headers = (chunks.headers || []).concat([args]);
+      res.chunks = chunks;
+      return res;
+    };
 
-      expectResult(mockRes, '404 Not Found', function () {
-        expect(mockRes.type).toBeCalledWith('text');
-        done();
-      });
-      fn(404, 'Not Found', mockRes)();
-    });
-  });
-
-  describe('notFound', function () {
-    const fn = lib[this.description];
-
-    it('should send not found error message', function (done) {
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(mockRes.status).toBeCalledWith(404);
-        done();
-      });
-      fn(new Error('Not Found'), mockRes);
+    beforeEach(() => {
+      responses.setDb(createStorage({ '/_users/a': {}, '/_users/aa': {}, '/_users/c': {}, '/other/z': {} }));
     });
 
-    it('should send not found even if there is no error message', function (done) {
-      expectResult(mockRes, 'sendStatus: whatever', function () {
-        expect(mockRes.status).toBeCalledWith(404);
-        done();
-      });
-      fn(new Error(), mockRes);
+    it('lists the users, under the host', async () => {
+      const res = response(),
+        finished = new Promise(resolve => res.on('finish', resolve));
+
+      responses.listUsers()({ hostname: 'base.com', baseUrl: '', path: '/_users/' }, res);
+      await finished;
+      assert.deepEqual(JSON.parse(res.chunks.join('')), ['base.com/_users/a', 'base.com/_users/aa', 'base.com/_users/c']);
+      assert.deepEqual(res.chunks.headers, [['Content-Type', 'application/json']]);
     });
-  });
 
-  describe('sendHTMLErrorCode', function () {
-    const fn = lib[this.description];
+    it('lists them under the path of the site', async () => {
+      const res = response(),
+        finished = new Promise(resolve => res.on('finish', resolve));
 
-    it('should send error message as html', function (done) {
-      mockRes.type = jest.fn();
-
-      expectResult(mockRes, '404 Not Found', function () {
-        expect(mockRes.type).toBeCalledWith('html');
-        done();
-      });
-      fn(404, 'Not Found', mockRes)();
+      responses.listUsers()({ hostname: 'base.com', baseUrl: '', path: '/some/path/_users/' }, res);
+      await finished;
+      assert.deepEqual(JSON.parse(res.chunks.join('')), ['base.com/some/path/_users/a', 'base.com/some/path/_users/aa', 'base.com/some/path/_users/c']);
     });
-  });
 
-  describe('sendJSONErrorCode', function () {
-    const fn = lib[this.description];
+    it('can be given other options', async () => {
+      const res = response(),
+        finished = new Promise(resolve => res.on('finish', resolve));
 
-    it('should send error message as json', function (done) {
-      const error = {
-        message: 'Not Found',
-        code: 404
-      };
-
-      mockRes.json = jest.fn();
-
-      fn(error.code, error.message, mockRes, {})();
-
-      expect(mockRes.json).toBeCalledWith(error);
-      done();
+      responses.listUsers({ prefix: '/other/' })({ hostname: 'h', baseUrl: '', path: '/_users/' }, res);
+      await finished;
+      assert.deepEqual(JSON.parse(res.chunks.join('')), ['h/other/z']);
     });
   });
 });

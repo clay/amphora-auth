@@ -1,54 +1,42 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  _includes = require('lodash/includes'),
+const { describe, it, mock } = require('node:test'),
+  assert = require('node:assert/strict'),
   passport = require('passport'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`),
+  bcrypt = require('bcryptjs'),
+  { createStorage } = require('../test/helpers/mocks'),
   utils = require('../utils'),
-  db = require('../services/storage');
+  local = require('./local'),
+  site = { slug: 'site', prefix: 'foo.com', protocol: 'http', port: 80, path: '/' };
 
-describe(_startCase(filename), function () {
-  describe('verifyLocal', function () {
-    const fn = lib[this.description];
+describe('local strategy', () => {
+  it('registers a strategy named for the site', () => {
+    const use = mock.method(passport, 'use', () => {});
 
-    it('calls verify with a slightly different function signature', function (done) {
-      utils.verify = jest.fn(() => (req, token, tokenSecret, profile, cb) => cb()) // eslint-disable-line
-      db.get = jest.fn().mockResolvedValue({ username: 'foo' });
-
-      fn()({}, 'foo', 'bar', function () {
-        expect(utils.verify).toBeCalled();
-        done();
-      });
-    });
+    local(site);
+    local({ ...site, subsiteSlug: 'sub' });
+    assert.deepEqual(use.mock.calls.map(c => c.arguments[0]), ['local-site', 'local-sub']);
+    assert.equal(use.mock.calls[0].arguments[1].name, 'local');
+    use.mock.restore();
   });
 
-  describe('createLocalStrategy', function () {
-    const siteStub = { slug: 'foo' };
+  it('checks the username and password against the stored user', async () => {
+    const db = createStorage({ [`/_users/${utils.encode('bob', 'local')}`]: { username: 'bob', provider: 'local', auth: 'admin', password: bcrypt.hashSync('secret', 4) } });
 
-    it('creates ldap strategy', function () {
-      passport.use = jest.fn();
+    utils.setDb(db);
+    const result = await new Promise(resolve => local.verifyLocal()({}, 'Bob', 'secret', (...args) => resolve(args))),
+      wrong = await new Promise(resolve => local.verifyLocal()({}, 'bob', 'nope', (...args) => resolve(args)));
 
-      lib(siteStub);
-
-      expect(passport.use).toBeCalled();
-    });
+    assert.equal(result[1].username, 'bob');
+    assert.deepEqual(wrong, [null, false, { message: 'Invalid Password' }]);
   });
 
-  describe('addAuthRoutes', function () {
-    const fn = lib[this.description],
-      paths = [],
-      router = {
-        post: function (path) {
-          // testing if the paths are added,
-          // we're checking the paths array after each test
-          paths.push(path);
-        }
-      };
+  it('adds a post route that goes back to the login page when it fails', () => {
+    const routes = [],
+      authenticate = mock.method(passport, 'authenticate', (...args) => args);
 
-    it('adds local auth routes', function () {
-      fn(router, {}, 'local');
-      expect(_includes(paths, '/_auth/local')).toEqual(true);
-    });
+    local.addAuthRoutes({ post: (...args) => routes.push(args) }, site, 'local');
+    assert.deepEqual(routes, [['/_auth/local', ['local-site', { failureRedirect: 'http://foo.com/_auth/login', failureFlash: true, successReturnToOrRedirect: '/' }]]]);
+    authenticate.mock.restore();
   });
 });
