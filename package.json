@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/clay/amphora-auth#readme",
   "dependencies": {
-    "bcryptjs": "^2.4.3",
+    "bcryptjs": "^3.0.3",
     "clay-log": "^1.6.0",
     "connect-redis": "^8.1.0",
     "express-session": "^1.15.6",
