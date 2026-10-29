@@ -83,6 +83,14 @@ export LDAP_SEARCH_BASE=<LDAP_SEARCH_BASE>
 export LDAP_SEARCH_FILTER=<LDAP_SEARCH_FILTER>
 ```
 
+The sessions are kept in the store that is passed in as `store`. When there is none, this module makes a Redis store from these (it connects when the first site is set up):
+
+```bash
+export REDIS_SESSION_HOST=redis://<host>:<port>/<db>   # redis:// or rediss://, defaults to a Redis on localhost
+export REDIS_DB=<name>                                 # the keys start with <name>-clay-session: (clay-session: without it)
+export CLAY_SESSION_SECRET=<secret>                    # signs the clay-session cookie. Set it: the default is not a secret
+```
+
 The following env variables are optional:
 
 This flag, when true, will prevent users from either going into edit mode or making any edits to a page they had already opened in edit mode in their browsers. This environment variable is optional and you can set it up from your Clay instance and it'll be picked up here since it'll share the same env file!
@@ -90,6 +98,18 @@ It will redirect users to the login page where they'll see a message saying that
 ```bash
 export MAINTENANCE_MODE_ENABLED=true
 ```
+
+A session keeps its id when someone signs in or out. To start a new session at sign in and at sign out instead (which stops a session id that was planted before sign in from being the signed in one), set:
+
+```bash
+export CLAY_SESSION_REGENERATE=true
+```
+
+Anything that depends on the id staying the same, like an auth proxy that signs in a session on behalf of another host, doesn't work with it on.
+
+## Requirements
+
+Node 26.12.1 or later. `clayhandlebars` 5 or 6 is a peer dependency. The Google, LDAP, Twitter, Slack and Cognito strategies are loaded when a site uses them, so only the ones in use are loaded.
 
 ## License
 
