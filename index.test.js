@@ -70,6 +70,14 @@ describe('index', () => {
       assert.equal(req.session.returnTo, '/page?edit=true');
       assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
+
+    it('sends the user to the login page when there is no session to remember where they were going in (the session store is down)', () => {
+      const req = { isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true' },
+        res = createRes();
+
+      lib.isAuthenticated(site)(req, res, () => assert.fail('next'));
+      assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
+    });
   });
 
   describe('protectRoutes', () => {
@@ -95,17 +103,26 @@ describe('index', () => {
     it('shows the login page, with the providers and the flash', () => {
       const res = createRes();
 
-      lib.onLogin(site, ['google', 'local'])({ flash: () => ({ error: ['Invalid Password'] }) }, res);
+      lib.onLogin(site, ['google', 'local'])({ session: {}, flash: () => ({ error: ['Invalid Password'] }) }, res);
       assert.equal(res.calls[0][0], 'send');
       assert.match(res.calls[0][1], /Log in with Google/);
       assert.match(res.calls[0][1], /Invalid Password/);
       assert.match(res.calls[0][1], /id="username"/); // the form of the local provider
     });
 
+    it('shows the login page, and says signing in is not available, when there is no session (the session store is down)', () => {
+      const res = createRes();
+
+      lib.onLogin(site, ['google'])({ flash: () => assert.fail('asked for the flash of a session that is not there') }, res);
+      assert.equal(res.calls[0][0], 'send');
+      assert.match(res.calls[0][1], /Log in with Google/);
+      assert.match(res.calls[0][1], /Signing in is not available right now/);
+    });
+
     it('shows who is signed in, and a way to log out', () => {
       const res = createRes();
 
-      lib.onLogin(site, ['google'])({ flash: () => ({}), user: { username: 'ann@example.com', name: 'Ann' } }, res);
+      lib.onLogin(site, ['google'])({ session: {}, flash: () => ({}), user: { username: 'ann@example.com', name: 'Ann' } }, res);
       assert.match(res.calls[0][1], /Welcome, Ann/);
       assert.match(res.calls[0][1], /href="http:\/\/domain.com\/_auth\/logout"/);
     });
@@ -113,7 +130,7 @@ describe('index', () => {
     it('asks for the credentials again when the ones sent were wrong', () => {
       const res = createRes();
 
-      lib.onLogin(site, [])({ flash: () => ({ error: ['Invalid username/password'] }) }, res);
+      lib.onLogin(site, [])({ session: {}, flash: () => ({ error: ['Invalid username/password'] }) }, res);
       assert.equal(res.statusCode, 401);
       assert.deepEqual(res.calls, [['setHeader', 'WWW-Authenticate', 'Basic realm="Incorrect Credentials"'], ['end', 'Access denied']]);
     });

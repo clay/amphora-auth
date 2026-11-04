@@ -314,6 +314,25 @@ describe('integration', () => {
       app.store.emit('connect');
       assert.equal((await app.request('GET', '/page?edit=true')).status, 200);
     });
+
+    it('shows the login page, not a redirect to itself, and goes back to normal when it is back', async () => {
+      const app = await make({ providers: ['google', 'apikey'] });
+
+      app.store.emit('disconnect', new Error('redis is down'));
+      assert.equal((await app.request('GET', '/page?edit=true', { cookies: {} })).location, loginPage);
+
+      const login = await app.request('GET', '/_auth/login', { cookies: {} });
+
+      assert.equal(login.status, 200);
+      assert.match(login.body, /Log in with Google/);
+      assert.match(login.body, /Signing in is not available right now/);
+
+      app.store.emit('connect');
+      const back = await app.request('GET', '/_auth/login', { cookies: {} });
+
+      assert.equal(back.status, 200);
+      assert.doesNotMatch(back.body, /not available right now/);
+    });
   });
 
   it('reads the hash of the stored users', () => {

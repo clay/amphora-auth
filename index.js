@@ -53,7 +53,8 @@ function isAuthenticated(site) {
       // try to authenticate with api key
       passport.authenticate('apikey', { session: false })(req, res, next);
     } else {
-      req.session.returnTo = req.originalUrl; // redirect to this page after logging in
+      // redirect to this page after logging in (there is no session to keep it in while the session store is down)
+      if (req.session) req.session.returnTo = req.originalUrl;
       // otherwise redirect to login
       res.redirect(`${getAuthUrl(site)}/login`);
     }
@@ -79,6 +80,17 @@ function protectRoutes(site) {
 }
 
 /**
+ * the messages for the login page, and what is not there to read them from: express-session leaves the session out
+ * while the session store is down, nobody can sign in then, and asking for the messages would throw (and the error
+ * handler would send them back to this page, again and again)
+ * @param {object} req
+ * @returns {object}
+ */
+function loginMessages(req) {
+  return req.session ? req.flash() : { error: ['Signing in is not available right now. Please try again in a few minutes.'] };
+}
+
+/**
  * middleware to show login page
  * @param {object} site
  * @param {array} providers
@@ -89,7 +101,7 @@ function onLogin(site, providers) {
     const template = compileLoginPage(),
       currentProviders = getProviders(providers, site),
       authUrl = getAuthUrl(site),
-      flash = req.flash();
+      flash = loginMessages(req);
 
     if (flash && includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
