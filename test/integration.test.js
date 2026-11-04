@@ -300,6 +300,34 @@ describe('integration', () => {
     });
   });
 
+  describe('routes that are open', () => {
+    it('needs a sign in for a route that has no check of its own, whatever the query string says', async () => {
+      const app = await make();
+
+      for (const path of ['/open', '/open?x=/_auth', '/open?next=/_auth/local', '/api/thing?x=/_auth']) {
+        const res = await app.request(path.startsWith('/api') ? 'PUT' : 'POST', path, { cookies: {} });
+
+        assert.deepEqual([res.status, res.location], [302, loginPage], path);
+      }
+    });
+
+    it('keeps a route with /_auth in its path open, as before', async () => {
+      const app = await make(),
+        res = await app.request('POST', '/hooks/_auth/notify', { cookies: {} });
+
+      assert.deepEqual([res.status, res.body], [200, { reached: 'auth in the name' }]);
+    });
+
+    it('lets a signed in user reach a route whose query string has /_auth in it', async () => {
+      const app = await make();
+
+      await app.request('POST', '/_auth/local', { body: login, form: true });
+      const res = await app.request('PUT', '/api/thing?x=/_auth', { body: {} });
+
+      assert.deepEqual([res.status, res.body], [200, { ok: 'write' }]);
+    });
+  });
+
   describe('signing in without the login page (CLAY_AUTH_AUTO_LOGIN)', () => {
     const html = { accept: 'text/html,application/xhtml+xml' },
       withAutoLogin = async (provider, test) => {

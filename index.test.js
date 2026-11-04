@@ -43,6 +43,16 @@ describe('index', () => {
       assert.equal(lib.isProtectedRoute({ query: { edit: '1' }, method: 'POST', originalUrl: '/_auth/local' }), true);
     });
 
+    it('is false for /_auth anywhere in the path, as for a route that is named for the auth routes', () => {
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl: '/hooks/_auth/notify' }), false);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'PUT', originalUrl: '/hooks/notify_auth/_auth-x?a=1' }), false);
+    });
+
+    it('does not open a route because of what is in the query string', () => {
+      ['/open?x=/_auth', '/open?next=/_auth/local', '/open?a=1&b=/_auth/x', '/site/open?/_auth'].forEach(originalUrl => {
+        assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl }), true, originalUrl);
+      });
+    });
   });
 
   describe('isAuthenticated', () => {

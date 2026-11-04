@@ -86,6 +86,9 @@ async function build(options = {}) {
   router.get('/page', (req, res) => res.json({ user: req.user ? req.user.username || req.user.provider : null, auth: req.user ? req.user.auth : null }));
   router.put('/api/thing', auth.withAuthLevel(auth.authLevels.WRITE), (req, res) => res.json({ ok: 'write' }));
   router.post('/admin', auth.withAuthLevel(auth.authLevels.ADMIN), (req, res) => res.json({ ok: 'admin' }));
+  // routes of a site or a plugin that have no check of their own, and one that is named for the auth routes
+  router.post('/open', (req, res) => res.json({ reached: 'open' }));
+  router.post('/hooks/_auth/notify', (req, res) => res.json({ reached: 'auth in the name' }));
   auth.addRoutes(users);
   router.use('/_users', users);
   app.use(router);
