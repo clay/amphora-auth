@@ -20,7 +20,7 @@ describe('login', () => {
 
     it('registers the icons as partials', () => {
       compileLoginPage();
-      ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito'].forEach(icon => {
+      ['clay-logo', 'google', 'ldap', 'logout'].forEach(icon => {
         assert.equal(typeof handlebars.partials[icon], 'function', icon);
       });
     });

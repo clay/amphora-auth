@@ -1,16 +1,15 @@
 'use strict';
 
 // Each strategy is loaded the first time it is used, so a site that signs in with Google and API keys doesn't
-// load the LDAP, Twitter, Slack and Cognito packages (the Cognito one brings in the AWS SDK).
+// load the LDAP package.
 const STRATEGIES = {
-  apikey: () => require('./key'),
-  cognito: () => require('./cognito'),
-  google: () => require('./google'),
-  ldap: () => require('./ldap'),
-  twitter: () => require('./twitter'),
-  slack: () => require('./slack'),
-  local: () => require('./local')
-};
+    apikey: () => require('./key'),
+    google: () => require('./google'),
+    ldap: () => require('./ldap'),
+    local: () => require('./local')
+  },
+  // providers of 2.x that are gone, so a site that still lists one is told why
+  REMOVED = ['cognito', 'slack', 'twitter'];
 
 /**
  * get a strategy module (requiring it the first time)
@@ -20,6 +19,10 @@ const STRATEGIES = {
  */
 function getStrategy(provider) {
   if (!Object.hasOwn(STRATEGIES, provider)) {
+    if (REMOVED.includes(provider)) {
+      throw new Error(`Provider ${provider} was removed in amphora-auth 3. Use one of: ${Object.keys(STRATEGIES).join(', ')}!`);
+    }
+
     throw new Error(`Unknown provider: ${provider}!`);
   }
 

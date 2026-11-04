@@ -23,7 +23,7 @@ function compiled(filename) {
  */
 function compileLoginPage() {
   const tpl = compiled('login.handlebars'),
-    icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito'];
+    icons = ['clay-logo', 'google', 'ldap', 'logout'];
 
   // add svgs to handlebars
   icons.forEach(icon => {

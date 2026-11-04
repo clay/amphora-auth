@@ -42,13 +42,10 @@
     "handlebars": "^4.7.10",
     "ioredis": "^5.11.1",
     "passport": "^0.7.0",
-    "passport-cognito-oauth2": "^0.1.1",
     "passport-google-oauth": "^1.0.0",
     "passport-http-header-token": "^1.1.0",
     "passport-ldapauth": "^2.1.1",
-    "passport-local": "^1.0.0",
-    "passport-slack": "0.0.7",
-    "passport-twitter": "^1.0.4"
+    "passport-local": "^1.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

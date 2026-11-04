@@ -29,10 +29,9 @@ amphoraAuth({
 This module provides local authentication in Clay with a username and password and allows for easy configuration of Oauth for authentication with third-party providers. Here's a list of the supported providers:
 
 - Google
-- Twitter
-- Slack
-- Cognito
 - LDAP
+
+Twitter, Slack and Cognito sign-in were removed in version 3. A site that still lists one of them gets an error at startup that says so.
 
 To get started editing in Clay, create a user account. The easiest way to do this is to create a `user.yml` file that looks like this:
 
@@ -62,19 +61,8 @@ The following env variables are required in order to be able to authenticate a u
 ```bash
 export CLAY_PROVIDER=google
 
-export TWITTER_CONSUMER_KEY=<TWITTER_CONSUMER_KEY>
-export TWITTER_CONSUMER_SECRET=<TWITTER_CONSUMER_SECRET>
-
 export GOOGLE_CONSUMER_KEY=<GOOGLE_CONSUMER_KEY>
 export GOOGLE_CONSUMER_SECRET=<GOOGLE_CONSUMER_SECRET>
-
-export SLACK_CONSUMER_KEY=<SLACK_CONSUMER_KEY>
-export SLACK_CONSUMER_SECRET=<SLACK_CONSUMER_SECRET>
-
-export COGNITO_CONSUMER_KEY=<COGNITO_CLIENT_ID>
-export COGNITO_CONSUMER_SECRET=<COGNITO_SECRET>
-export COGNITO_CONSUMER_DOMAIN=<COGNITO_AUTHENICATION_DOMAIN>
-export COGNITO_CONSUMER_REGION=<COGNITO_INSTANCE_REGION>
 
 export LDAP_URL=<LDAP_URL>
 export LDAP_BIND_DN=<LDAP_BIND_DN>
@@ -109,7 +97,7 @@ Anything that depends on the id staying the same, like an auth proxy that signs 
 
 ## Requirements
 
-Node 26.12.1 or later. `clayhandlebars` 5 or 6 is a peer dependency. The Google, LDAP, Twitter, Slack and Cognito strategies are loaded when a site uses them, so only the ones in use are loaded.
+Node 26.12.1 or later. `clayhandlebars` 5 or 6 is a peer dependency. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded.
 
 ## License
 

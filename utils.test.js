@@ -32,8 +32,8 @@ describe('utils', () => {
 
   describe('getCallbackUrl', () => {
     it('is the auth url of the provider, then callback', () => {
-      assert.equal(utils.getCallbackUrl({ ...site, prefix: 'domain.com/foo' }, 'twitter'), 'http://domain.com/foo/_auth/twitter/callback');
-      assert.equal(utils.getCallbackUrl({ ...site, prefix: 'domain.com/' }, 'twitter'), 'http://domain.com/_auth/twitter/callback');
+      assert.equal(utils.getCallbackUrl({ ...site, prefix: 'domain.com/foo' }, 'google'), 'http://domain.com/foo/_auth/google/callback');
+      assert.equal(utils.getCallbackUrl({ ...site, prefix: 'domain.com/' }, 'google'), 'http://domain.com/_auth/google/callback');
     });
   });
 
@@ -48,8 +48,8 @@ describe('utils', () => {
 
   describe('generateStrategyName', () => {
     it('is the provider and the slug, of the subsite when there is one', () => {
-      assert.equal(utils.generateStrategyName('twitter', { slug: 'example' }), 'twitter-example');
-      assert.equal(utils.generateStrategyName('twitter', { slug: 'example', subsiteSlug: 'sub' }), 'twitter-sub');
+      assert.equal(utils.generateStrategyName('google', { slug: 'example' }), 'google-example');
+      assert.equal(utils.generateStrategyName('google', { slug: 'example', subsiteSlug: 'sub' }), 'google-sub');
     });
   });
 

@@ -18,7 +18,7 @@ describe('strategies', () => {
       assert.deepEqual(use.mock.calls.map(c => c.arguments[0]), ['apikey', 'google-site']);
       assert.ok(loaded().includes('passport-google-oauth'));
       assert.ok(loaded().includes('passport-http-header-token'));
-      ['passport-ldapauth', 'passport-twitter', 'passport-slack', 'passport-cognito-oauth2', 'aws-sdk'].forEach(name => assert.ok(!loaded().includes(name), name));
+      assert.ok(!loaded().includes('passport-ldapauth'));
       use.mock.restore();
     });
 
@@ -35,6 +35,17 @@ describe('strategies', () => {
 
       assert.throws(() => strategies.createStrategy(['nope'], site), { message: 'Unknown provider: nope!' });
       assert.throws(() => strategies.createStrategy(['constructor'], site), { message: 'Unknown provider: constructor!' });
+      use.mock.restore();
+    });
+
+    it('says which providers were removed, and what is left', () => {
+      const use = mock.method(passport, 'use', () => {});
+
+      ['cognito', 'slack', 'twitter'].forEach(provider => {
+        assert.throws(() => strategies.createStrategy([provider], site), {
+          message: `Provider ${provider} was removed in amphora-auth 3. Use one of: apikey, google, ldap, local!`
+        });
+      });
       use.mock.restore();
     });
   });
@@ -69,8 +80,9 @@ describe('strategies', () => {
       }
     });
 
-    it('throws for a provider it does not know', () => {
+    it('throws for a provider it does not know, or that was removed', () => {
       assert.throws(() => strategies.addAuthRoutes(['nope'], { get() {} }, site), { message: 'Unknown provider: nope!' });
+      assert.throws(() => strategies.addAuthRoutes(['twitter'], { get() {} }, site), { message: /^Provider twitter was removed/ });
     });
   });
 });
