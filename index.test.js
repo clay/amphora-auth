@@ -2,7 +2,7 @@
 
 process.env.LOG = 'silent';
 
-const { describe, it, mock } = require('node:test'),
+const { describe, it, mock, afterEach } = require('node:test'),
   { EventEmitter } = require('events'),
   assert = require('node:assert/strict'),
   passport = require('passport'),
@@ -42,6 +42,7 @@ describe('index', () => {
       assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl: '/site/_auth/local' }), false);
       assert.equal(lib.isProtectedRoute({ query: { edit: '1' }, method: 'POST', originalUrl: '/_auth/local' }), true);
     });
+
   });
 
   describe('isAuthenticated', () => {
@@ -77,6 +78,50 @@ describe('index', () => {
 
       lib.isAuthenticated(site)(req, res, () => assert.fail('next'));
       assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
+    });
+
+    describe('with CLAY_AUTH_AUTO_LOGIN', () => {
+      const providers = ['google', 'apikey'],
+        opening = (extra = {}) => ({ isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true', session: {}, method: 'GET', accepts: types => types[0], ...extra }),
+        redirectOf = (req, withProviders = providers) => {
+          const res = createRes();
+
+          lib.isAuthenticated(site, withProviders)(req, res, () => assert.fail('next'));
+          return res.calls[0][1];
+        };
+
+      afterEach(() => {
+        delete process.env.CLAY_AUTH_AUTO_LOGIN;
+      });
+
+      it('sends someone who opens a page to the provider, remembering the page', () => {
+        const req = opening();
+
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(req), 'http://domain.com/_auth/google');
+        assert.equal(req.session.returnTo, '/page?edit=true');
+      });
+
+      it('sends everyone to the login page without it', () => {
+        assert.equal(redirectOf(opening()), 'http://domain.com/_auth/login');
+      });
+
+      it('keeps the login page for a script that wants json, for anything but a GET, and when it can not tell', () => {
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(opening({ accepts: types => types[1] })), 'http://domain.com/_auth/login');
+        ['POST', 'PUT', 'DELETE', 'HEAD'].forEach(method => assert.equal(redirectOf(opening({ method })), 'http://domain.com/_auth/login', method));
+        assert.equal(redirectOf(opening({ accepts: undefined })), 'http://domain.com/_auth/login');
+      });
+
+      it('keeps the login page when the provider is not one the site has, or is not one to sign in with', () => {
+        ['ldap', 'twitter', 'local', 'apikey', 'constructor'].forEach(name => {
+          process.env.CLAY_AUTH_AUTO_LOGIN = name;
+          assert.equal(redirectOf(opening()), 'http://domain.com/_auth/login', name);
+        });
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(opening(), null), 'http://domain.com/_auth/login'); // providers not given
+        assert.equal(redirectOf(opening(), ['local', 'apikey']), 'http://domain.com/_auth/login');
+      });
     });
   });
 

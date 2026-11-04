@@ -34,11 +34,29 @@ function isProtectedRoute(req) {
 }
 
 /**
+ * where someone who has to sign in is sent: the login page, or the provider itself when CLAY_AUTH_AUTO_LOGIN names one
+ * of the providers of the site and the request is someone opening a page (not a script that waits for json), so
+ * there is no login page to click through. Signing in at the provider is quick when they are signed in there already
+ * @param {object} req
+ * @param {object} site
+ * @param {string[]} providers
+ * @returns {string}
+ */
+function signInUrl(req, site, providers) {
+  const name = process.env.CLAY_AUTH_AUTO_LOGIN,
+    opensPage = req.method === 'GET' && typeof req.accepts === 'function' && req.accepts(['html', 'json']) === 'html',
+    provider = name && opensPage && getProviders(providers, site).find(current => current.name === name);
+
+  return provider ? provider.url : `${getAuthUrl(site)}/login`;
+}
+
+/**
  * protect routes
  * @param {object} site
+ * @param {string[]} [providers]
  * @returns {Function}
  */
-function isAuthenticated(site) {
+function isAuthenticated(site, providers) {
   return function (req, res, next) {
     // This variable controls wether or not people can log in to Clay
     // and stops people from being able to make edits to pages.
@@ -56,7 +74,7 @@ function isAuthenticated(site) {
       // redirect to this page after logging in (there is no session to keep it in while the session store is down)
       if (req.session) req.session.returnTo = req.originalUrl;
       // otherwise redirect to login
-      res.redirect(`${getAuthUrl(site)}/login`);
+      res.redirect(signInUrl(req, site, providers));
     }
   };
 }
@@ -67,12 +85,13 @@ passport.deserializeUser(deserializeUser);
 /**
  * the actual middleware that protects our routes, plz no hax
  * @param {object} site
+ * @param {string[]} [providers]
  * @returns {function}
  */
-function protectRoutes(site) {
+function protectRoutes(site, providers) {
   return function (req, res, next) {
     if (req.method !== 'OPTIONS' && module.exports.isProtectedRoute(req)) { // allow mocking of these for testing
-      module.exports.isAuthenticated(site)(req, res, next);
+      module.exports.isAuthenticated(site, providers)(req, res, next);
     } else {
       next();
     }
@@ -275,7 +294,7 @@ function init({ router, providers, store, site, storage, bus }) {
   router.use(flash());
 
   // protect routes
-  router.use(protectRoutes(site));
+  router.use(protectRoutes(site, providers));
 
   // add authorization routes
   // note: these (and the provider routes) are added here,
