@@ -1,7 +1,6 @@
 'use strict';
 
-const _get = require('lodash/get'),
-  { AUTH_LEVELS } = require('../constants'),
+const { AUTH_LEVELS } = require('../constants'),
   { removePrefix } = require('../utils');
 
 /**
@@ -43,7 +42,7 @@ function checkAuthLevel(userLevel, requiredLevel) {
  */
 function withAuthLevel(requiredLevel) {
   return function (req, res, next) {
-    if (checkAuthLevel(_get(req, 'user.auth', ''), requiredLevel)) {
+    if (checkAuthLevel(req?.user?.auth ?? '', requiredLevel)) {
       // If the user exists and meets the level requirement, let the request proceed
       next();
     } else {

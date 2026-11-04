@@ -1,91 +1,65 @@
 'use strict';
 
-const _startCase = require('lodash/startCase'),
-  filename = __filename.split('/').pop().split('.').shift(),
-  lib = require(`./${filename}`),
-  encrypt = require('../services/encrypt'),
+const { describe, it, beforeEach } = require('node:test'),
+  assert = require('node:assert/strict'),
+  bcrypt = require('bcryptjs'),
+  { createStorage } = require('../test/helpers/mocks'),
   { encode } = require('../utils'),
-  storage = require('../test/fixtures/mocks/storage');
+  users = require('./users');
 
-describe(_startCase(filename), function () {
-  let mockData = {
-      username: 'foo',
-      password: 'bar',
-      provider: 'local',
-      auth: 'admin',
-    },
-    fakeDb, fakeBus;
+describe('users controller', () => {
+  let db, published;
 
-  beforeEach(function () {
-    fakeDb = storage();
-
-    fakeBus = {
-      publish: jest.fn()
-    };
-
-    lib.setDb(fakeDb);
-    lib.setBus(fakeBus);
+  beforeEach(() => {
+    db = createStorage();
+    published = [];
+    users.setDb(db);
+    users.setBus({ publish: (...args) => published.push(args) });
   });
 
-  describe('createUser', function () {
-    const fn = lib[this.description];
-
-    it('should throw if there is no data', function () {
-      const cb = () => fn();
-
-      expect(cb).toThrow();
+  describe('createUser', () => {
+    it('throws if the user lacks a username, provider or auth level', () => {
+      [undefined, {}, { username: 'a' }, { username: 'a', provider: 'p' }, { provider: 'p', auth: 'a' }].forEach(data => {
+        assert.throws(() => users.createUser(data), { message: 'Users require username, provider and auth to be specified!' });
+      });
     });
 
-    it('should encrypt password if provided', function () {
-      fakeDb.put.mockResolvedValue(mockData);
-      encrypt.hashPassword = jest.fn();
+    it('saves the user under the encoded, lower cased username and provider, and tells the bus', async () => {
+      const uri = `/_users/${encode('bob', 'google')}`,
+        user = await users.createUser({ username: 'Bob', provider: 'google', auth: 'write' });
 
-      return fn(mockData)
-        .then(() => expect(encrypt.hashPassword).toHaveBeenCalled());
+      assert.equal(user._ref, uri);
+      assert.deepEqual(JSON.parse(db.data.get(uri)), { username: 'Bob', provider: 'google', auth: 'write' });
+      assert.deepEqual(published, [['saveUser', { key: uri, value: user }]]);
     });
 
-    it('should create an user', function () {
-      const uri = `/_users/${encode(mockData.username.toLowerCase(), mockData.provider)}`,
-        expected = Object.assign(mockData, { _ref: uri });
+    it('hashes the password with bcrypt', async () => {
+      const user = await users.createUser({ username: 'bob', password: 'secret', provider: 'local', auth: 'admin' }),
+        stored = JSON.parse(db.data.get(user._ref));
 
-      fakeDb.put.mockResolvedValue(expected);
+      assert.notEqual(stored.password, 'secret');
+      assert.equal(bcrypt.compareSync('secret', stored.password), true);
+    });
 
-      return fn(mockData)
-        .then(result => {
-          expect(fakeDb.put).toHaveBeenCalled();
-          expect(result._ref).toBe(expected._ref);
-          expect(fakeBus.publish).toBeCalledWith('saveUser', { key: uri, value: expected });
-        });
+    it('does not tell the bus if the user could not be saved', async () => {
+      db.put = () => Promise.reject(new Error('db down'));
+      await assert.rejects(users.createUser({ username: 'a', provider: 'p', auth: 'a' }), { message: 'db down' });
+      assert.deepEqual(published, []);
     });
   });
 
-  describe('deleteUser', function () {
-    const fn = lib[this.description];
-
-    it('should delete an user', function () {
-      const expected = mockData,
-        uri = `/_users/${encode(mockData.username.toLowerCase(), mockData.provider)}`;
-
-      fakeDb.get.mockResolvedValue(expected);
-      fakeDb.del.mockResolvedValue();
-
-      return fn(uri)
-        .then(result => {
-          expect(fakeDb.get).toBeCalledWith(uri);
-          expect(fakeDb.del).toBeCalledWith(uri);
-          expect(fakeBus.publish).toBeCalledWith('deleteUser', { uri });
-          expect(result).toEqual(expected);
-        });
+  describe('deleteUser', () => {
+    it('deletes the user, tells the bus and gives the user back', async () => {
+      db.data.set('/_users/a', JSON.stringify({ username: 'a' }));
+      assert.deepEqual(await users.deleteUser('/_users/a'), { username: 'a' });
+      assert.equal(db.data.has('/_users/a'), false);
+      assert.deepEqual(published, [['deleteUser', { uri: '/_users/a' }]]);
     });
 
-    it('should not delete an user if no uri is passed', function () {
-      fakeDb.get.mockRejectedValue();
-
-      return fn()
-        .catch(() => {
-          expect(fakeDb.get).toBeCalledWith('');
-          expect(fakeDb.del).not.toBeCalled();
-        });
+    it('deletes nothing that is not there', async () => {
+      await assert.rejects(users.deleteUser('/_users/nope'), { message: 'not found' });
+      await assert.rejects(users.deleteUser(), { message: 'not found' });
+      assert.deepEqual(published, []);
     });
   });
 });

@@ -1,8 +1,6 @@
 'use strict';
-const _isEmpty = require('lodash/isEmpty'),
-  _includes = require('lodash/includes'),
-  passport = require('passport'),
-  flash = require('express-flash'),
+const passport = require('passport'),
+  flash = require('./lib/flash'),
   { compileLoginPage } = require('./services/login'),
   {
     getAuthUrl,
@@ -13,10 +11,13 @@ const _isEmpty = require('lodash/isEmpty'),
   } = require('./utils'),
   createSessionStore = require('./services/session-store'),
   strategyService = require('./strategies'),
-  { AUTH_LEVELS, MAINTENANCE_MODE_ENABLED } = require('./constants'),
+  { AUTH_LEVELS, MAINTENANCE_MODE_ENABLED, REGENERATE_SESSION } = require('./constants'),
   { withAuthLevel } = require('./services/auth'),
   { setDb } = require('./services/storage'),
-  { setBus } = require('./controllers/users');
+  { setBus } = require('./controllers/users'),
+  { isEmpty, includes } = require('./lib/helpers'),
+  log = require('./services/logger').setup({ file: __filename }),
+  KEEPS_SESSION_INFO = Symbol('keepsSessionInfo');
 
 /**
  * determine if a route is protected
@@ -27,8 +28,8 @@ const _isEmpty = require('lodash/isEmpty'),
 function isProtectedRoute(req) {
   return (
     !!req.query.edit
-    || !_includes(req.originalUrl, '/_auth')
-    && !_includes(['GET', 'HEAD'], req.method)
+    || !includes(req.originalUrl, '/_auth')
+    && !includes(['GET', 'HEAD'], req.method)
   );
 }
 
@@ -52,7 +53,8 @@ function isAuthenticated(site) {
       // try to authenticate with api key
       passport.authenticate('apikey', { session: false })(req, res, next);
     } else {
-      req.session.returnTo = req.originalUrl; // redirect to this page after logging in
+      // redirect to this page after logging in (there is no session to keep it in while the session store is down)
+      if (req.session) req.session.returnTo = req.originalUrl;
       // otherwise redirect to login
       res.redirect(`${getAuthUrl(site)}/login`);
     }
@@ -78,6 +80,17 @@ function protectRoutes(site) {
 }
 
 /**
+ * the messages for the login page, and what is not there to read them from: express-session leaves the session out
+ * while the session store is down, nobody can sign in then, and asking for the messages would throw (and the error
+ * handler would send them back to this page, again and again)
+ * @param {object} req
+ * @returns {object}
+ */
+function loginMessages(req) {
+  return req.session ? req.flash() : { error: ['Signing in is not available right now. Please try again in a few minutes.'] };
+}
+
+/**
  * middleware to show login page
  * @param {object} site
  * @param {array} providers
@@ -88,9 +101,9 @@ function onLogin(site, providers) {
     const template = compileLoginPage(),
       currentProviders = getProviders(providers, site),
       authUrl = getAuthUrl(site),
-      flash = req.flash();
+      flash = loginMessages(req);
 
-    if (flash && _includes(flash.error, 'Invalid username/password')) {
+    if (flash && includes(flash.error, 'Invalid username/password')) {
       res.statusCode = 401;
       res.setHeader('WWW-Authenticate', 'Basic realm="Incorrect Credentials"');
       res.end('Access denied');
@@ -127,8 +140,22 @@ function onLogin(site, providers) {
  */
 function onLogout(site) {
   return function (req, res) {
-    req.logout();
-    res.redirect(`${getAuthUrl(site)}/login`);
+    const toLogin = () => res.redirect(`${getAuthUrl(site)}/login`);
+
+    // passport 0.6 and later save the session when logging out, which would store an empty one for someone who isn't
+    // signed in. A session that has a user that can't be loaded any more (req.user isn't set) still needs to be cleared
+    if (!req.user && !req.session?.passport?.user) {
+      toLogin();
+      return;
+    }
+
+    req.logout(function (err) {
+      if (err) {
+        log('error', 'Could not log out', { error: err });
+      }
+
+      toLogin();
+    });
   };
 }
 
@@ -163,6 +190,60 @@ function addUser(req, res, next) {
 }
 
 /**
+ * passport.initialize(), but a session keeps its id when someone signs in or out unless REGENERATE_SESSION is on
+ * @returns {function}
+ */
+function initializePassport() {
+  const initialize = passport.initialize();
+
+  return function (req, res, next) {
+    if (req.session && !REGENERATE_SESSION) {
+      req.session.regenerate = callback => callback();
+    }
+
+    initialize(req, res, next);
+  };
+}
+
+/**
+ * passport.session(), skipped when there is no session: express-session leaves it out while the session store is
+ * down, and passport 0.6 and later fail the request without one (passport 0.3 let it through as signed out)
+ * @returns {function}
+ */
+function restoreSession() {
+  const session = passport.session();
+
+  return function (req, res, next) {
+    if (req.session) {
+      session(req, res, next);
+    } else {
+      next();
+    }
+  };
+}
+
+/**
+ * When a session is regenerated at sign in, keep what it held (where to go next) unless a route says otherwise
+ */
+function keepSessionInfo() {
+  if (passport.authenticate[KEEPS_SESSION_INFO]) {
+    return;
+  }
+
+  const authenticate = passport.authenticate,
+    keeping = function (strategy, options, callback) {
+      if (options === undefined || options !== null && typeof options === 'object') {
+        options = Object.assign({ keepSessionInfo: true }, options);
+      }
+
+      return authenticate.call(this, strategy, options, callback);
+    };
+
+  keeping[KEEPS_SESSION_INFO] = true;
+  passport.authenticate = keeping;
+}
+
+/**
  * Initialize authentication
  * @param {object} params
  * @param {express.Router} params.router
@@ -172,7 +253,7 @@ function addUser(req, res, next) {
  * @returns {object[]}
  */
 function init({ router, providers, store, site, storage, bus }) {
-  if (_isEmpty(providers)) {
+  if (isEmpty(providers)) {
     return []; // exit early if no providers are passed in
   }
 
@@ -181,12 +262,16 @@ function init({ router, providers, store, site, storage, bus }) {
 
   const currentProviders = getProviders(providers, site);
 
+  if (REGENERATE_SESSION) {
+    keepSessionInfo();
+  }
+
   strategyService.createStrategy(providers, site); // allow mocking this in tests
 
   // init session authentication
   router.use(createSessionStore(store));
-  router.use(passport.initialize());
-  router.use(passport.session());
+  router.use(initializePassport());
+  router.use(restoreSession());
   router.use(flash());
 
   // protect routes

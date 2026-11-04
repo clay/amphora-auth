@@ -1,7 +1,6 @@
 'use strict';
 
-const _bindAll = require('lodash/bindAll'),
-  responses = require('../services/responses'),
+const responses = require('../services/responses'),
   { AUTH_LEVELS } = require('../constants'),
   controller = require('../controllers/users'),
   { withAuthLevel } = require('../services/auth'),
@@ -13,7 +12,7 @@ const _bindAll = require('lodash/bindAll'),
    *
    * @namespace
    */
-  route = _bindAll({
+  route = {
     /**
      * Add an user and tell the bus
      * @param {object} req
@@ -32,10 +31,7 @@ const _bindAll = require('lodash/bindAll'),
     deleteUser(req, res) {
       return responses.expectJSON(() => controller.deleteUser(req.uri), res);
     }
-  }, [
-    'createUser',
-    'deleteUser'
-  ]);
+  };
 
 /**
  * We want to trim the everything before /users/ out of

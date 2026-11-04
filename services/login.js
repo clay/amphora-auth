@@ -1,20 +1,33 @@
 'use strict';
 
-const _each = require('lodash/each'),
-  handlebars = require('handlebars'),
-  utils = require('../utils');
+const handlebars = require('handlebars'),
+  utils = require('../utils'),
+  templates = new Map();
+
+/**
+ * Compiles a template from the views folder, once.
+ * @param {string} filename
+ * @returns {Handlebars.Template}
+ */
+function compiled(filename) {
+  if (!templates.has(filename)) {
+    templates.set(filename, utils.compileTemplate(filename));
+  }
+
+  return templates.get(filename);
+}
 
 /**
  * Creates the login page template.
  * @returns {Handlebars.Template}
  */
 function compileLoginPage() {
-  const tpl = utils.compileTemplate('login.handlebars'),
-    icons = ['clay-logo', 'twitter', 'google', 'slack', 'ldap', 'logout', 'cognito'];
+  const tpl = compiled('login.handlebars'),
+    icons = ['clay-logo', 'google', 'ldap', 'logout'];
 
   // add svgs to handlebars
-  _each(icons, icon => {
-    handlebars.registerPartial(icon, utils.compileTemplate(`${icon}.svg`));
+  icons.forEach(icon => {
+    handlebars.registerPartial(icon, compiled(`${icon}.svg`));
   });
 
   return tpl;

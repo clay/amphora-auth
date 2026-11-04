@@ -4,39 +4,61 @@
   "description": "An auth adapter for Amphora",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint --max-warnings 0 *.js",
-    "test": "npm run lint && jest",
-    "coveralls": "cat ./coverage/lcov.info | coveralls",
-    "release": "./.circleci/scripts/release.sh"
+    "lint": "eslint --max-warnings 0",
+    "test-local": "node --test \"*.test.js\" \"lib/*.test.js\" \"services/*.test.js\" \"controllers/*.test.js\" \"strategies/*.test.js\" \"test/*.test.js\"",
+    "test": "npm run lint && node --test --experimental-test-coverage --test-coverage-exclude=\"**/*.test.js\" --test-coverage-exclude=\"test/**\" --test-coverage-lines=95 \"*.test.js\" \"lib/*.test.js\" \"services/*.test.js\" \"controllers/*.test.js\" \"strategies/*.test.js\" \"test/*.test.js\"",
+    "release": "./scripts/release.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clay/amphora-auth.git"
   },
   "author": "",
   "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/clay/amphora-auth/issues"
+  },
+  "homepage": "https://github.com/clay/amphora-auth#readme",
+  "engines": {
+    "node": ">=26.12.1"
+  },
+  "files": [
+    "index.js",
+    "utils.js",
+    "constants.js",
+    "controllers/**/*.js",
+    "lib/**/*.js",
+    "routes/**/*.js",
+    "services/**/*.js",
+    "strategies/**/*.js",
+    "views/**",
+    "!**/*.test.js"
+  ],
   "dependencies": {
-    "basic-auth": "^2.0.1",
-    "bcryptjs": "^2.4.3",
-    "bluebird": "^3.5.3",
-    "clay-log": "^1.3.1",
-    "connect-redis": "^3.4.0",
-    "express-flash": "0.0.2",
-    "express-session": "^1.15.6",
-    "passport": "^0.3.2",
-    "passport-cognito-oauth2": "^0.1.1",
+    "bcryptjs": "^3.0.3",
+    "clay-log": "^1.6.0",
+    "connect-redis": "^8.1.0",
+    "express-session": "^1.19.0",
+    "handlebars": "^4.7.10",
+    "ioredis": "^5.11.1",
+    "passport": "^0.7.0",
     "passport-google-oauth": "^1.0.0",
     "passport-http-header-token": "^1.1.0",
-    "passport-ldapauth": "^2.1.1",
-    "passport-local": "^1.0.0",
-    "passport-slack": "0.0.7",
-    "passport-twitter": "^1.0.4",
-    "through2-map": "^3.0.0"
-  },
-  "devDependencies": {
-    "coveralls": "^3.0.3",
-    "eslint": "^5.12.0",
-    "jest": "^24.1.0",
-    "levelup": "^1.3.9",
-    "memdown": "^1.4.0"
+    "passport-local": "^1.0.0"
   },
   "peerDependencies": {
-    "clayhandlebars": "5"
+    "passport-ldapauth": "^2.1.1"
+  },
+  "peerDependenciesMeta": {
+    "passport-ldapauth": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.13.0",
+    "express": "^4.22.3",
+    "globals": "^16.5.0",
+    "passport-ldapauth": "^2.1.1"
   }
 }

@@ -1,8 +1,20 @@
 'use strict';
 
-const passport = require('passport'),
+const { createHash, timingSafeEqual } = require('crypto'),
+  passport = require('passport'),
   APIKeyStrategy = require('passport-http-header-token').Strategy,
   { getAuthUrl, getPathOrBase, generateStrategyName } = require('../utils');
+
+/**
+ * compare two strings in the same time whatever they have in common
+ * @param {string} a
+ * @param {string} b
+ * @returns {boolean}
+ */
+function safeEqual(a, b) {
+  return typeof a === 'string' && typeof b === 'string' &&
+    timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
+}
 
 /**
  * api key callback, checks to see if api key provided matches env variable
@@ -10,7 +22,7 @@ const passport = require('passport'),
  * @param {function} done
  */
 function apiCallback(apikey, done) {
-  if (apikey === process.env.CLAY_ACCESS_KEY) {
+  if (safeEqual(apikey, process.env.CLAY_ACCESS_KEY)) {
     // If we're using an API Key then we're assuming the user is
     // has admin privileges by defining the auth level in the next line
     done(null, { provider: 'apikey', auth: 'admin' });

@@ -1,13 +1,8 @@
 'use strict';
 
-const _assign = require('lodash/assign'),
-  _has = require('lodash/has'),
-  _includes = require('lodash/includes'),
-  _last = require('lodash/last'),
-  _omit = require('lodash/omit'),
-  bluebird = require('bluebird'),
-  map = require('through2-map'),
+const { Transform } = require('stream'),
   { removePrefix, getUri } = require('../utils'),
+  { includes, omit } = require('../lib/helpers'),
   omitProperties = ['password'],
   STATUS_CODE_ERROR = 400;
 let db = require('./storage'),
@@ -25,9 +20,35 @@ let db = require('./storage'),
  * @param {object} res
  */
 function expectJSON(fn, res) {
-  bluebird.try(fn).then(function (result) {
+  new Promise(resolve => resolve(fn())).then(function (result) {
     res.json(result);
   }).catch(handleError(res));
+}
+
+/**
+ * true for an error that carries its own HTTP status (and isn't a "not found")
+ * @param {*} err
+ * @returns {boolean}
+ */
+function hasOwnStatus(err) {
+  return Boolean(err && err.status) && err.name !== 'NotFoundError';
+}
+
+/**
+ * @param {Error} err
+ * @returns {boolean}
+ */
+function isNotFound(err) {
+  return err.name === 'NotFoundError' || err.message.indexOf('ENOENT') !== -1 || err.message.indexOf('not found') !== -1;
+}
+
+/**
+ * true for something thrown or rejected that isn't an Error (no message to look at)
+ * @param {*} err
+ * @returns {boolean}
+ */
+function isNotAnError(err) {
+  return typeof err?.message !== 'string' && err?.name !== 'NotFoundError';
 }
 
 /**
@@ -37,13 +58,15 @@ function expectJSON(fn, res) {
  */
 function handleError(res) {
   return function (err) {
-    if (err.status && err.name !== 'NotFoundError') {
+    if (hasOwnStatus(err)) {
       // If we're in this block, the error has a defined `status` property and
       // the error should be directed out immediately
       sendDefaultResponseForCode(err.status, err.message, res);
-    } else if (err.name === 'NotFoundError' ||
-      err.message.indexOf('ENOENT') !== -1 ||
-      err.message.indexOf('not found') !== -1) {
+    } else if (isNotAnError(err)) {
+      // something that isn't an Error was thrown or rejected. Answer it as a server error instead of throwing here,
+      // which would leave the request without a response
+      serverError(new Error(typeof err === 'string' ? err : ''), res);
+    } else if (isNotFound(err)) {
       notFound(err, res);
       // if the word "client" is ever in a message, it should be for the client. We enforce that here.
     } else if (err.message.indexOf('Client') !== -1) {
@@ -106,7 +129,7 @@ function sendHTMLErrorCode(code, message, res) {
  */
 function sendJSONErrorCode(code, message, res, extras) {
   return function () {
-    res.json(_assign({ message, code }, extras));
+    res.json(Object.assign({ message, code }, extras));
   };
 }
 
@@ -143,7 +166,7 @@ function notFound(err, res) {
  * @param {object} res
  */
 function clientError(err, res) {
-  log('error', err.message, { stack: err.stack });
+  log('error', err.message || 'Client Error', { error: err });
 
   // They know it's a 400 already, we don't need to repeat the fact that its an error.
   const message = removePrefix(err.message, ':'),
@@ -161,7 +184,7 @@ function clientError(err, res) {
  */
 function serverError(err, res) {
   // error is required to be logged
-  log('error', err.message, { stack: err.stack });
+  log('error', err.message || 'Server Error', { error: err });
 
   const message = err.message || 'Server Error', // completely hide these messages from outside
     code = 500;
@@ -201,7 +224,7 @@ function methodNotAllowed(options) {
     let message, code,
       method = req.method;
 
-    if (_includes(allowed, method.toLowerCase())) {
+    if (includes(allowed, method.toLowerCase())) {
       next();
     } else {
       code = 405;
@@ -247,15 +270,17 @@ function notAcceptable(options) {
 function listUsers(options) {
   return function (req, res) {
     const usersString = '/_users/',
-      listOptions = _assign({
+      listOptions = Object.assign({
         prefix: usersString,
         values: false,
         transforms() {
-          return [map({ wantStrings: true }, function (str) {
-            // We're going to construct base uri from the `getUri`
-            // function, but that will include `/_users` so we want
-            // to strip that out and then we're good
-            return `${getUri(req).replace(usersString, '')}${str}`;
+          return [new Transform({
+            transform(str, encoding, callback) {
+              // We're going to construct base uri from the `getUri`
+              // function, but that will include `/_users` so we want
+              // to strip that out and then we're good
+              callback(null, `${getUri(req).replace(usersString, '')}${str}`);
+            }
           })];
         }
       }, options),
@@ -275,7 +300,7 @@ function listUsers(options) {
 function denyReferenceAtRoot(req, res, next) {
   const { body } = req;
 
-  if (_has(body, '_ref')) {
+  if (body != null && Object.hasOwn(body, '_ref')) {
     sendDefaultResponseForCode(STATUS_CODE_ERROR, 'Reference (_ref) at root of object is not acceptable', res);
   } else {
     next();
@@ -303,7 +328,7 @@ function acceptJSONOnly(req, res, next) {
  * @param {function} next
  */
 function denyTrailingSlashOnId(req, res, next) {
-  if (_last(req.path) === '/') {
+  if (req.path?.endsWith('/')) {
     sendDefaultResponseForCode(STATUS_CODE_ERROR, 'Trailing slash on RESTful id in URL is not acceptable', res);
   } else {
     next();
@@ -318,7 +343,7 @@ function denyTrailingSlashOnId(req, res, next) {
 function getRouteFromDB(req, res) {
   expectJSON(() => {
     return db.get(req.uri)
-      .then(users => _omit(users, omitProperties));
+      .then(users => omit(users, omitProperties));
   }, res);
 }
 
