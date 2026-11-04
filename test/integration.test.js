@@ -371,6 +371,20 @@ describe('integration', () => {
       assert.deepEqual([login.status, /User not found!/.test(login.body)], [200, true]);
     }));
 
+    it('shows the login page, which says signing in is not available, while the session store is down', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] });
+
+      app.store.emit('disconnect', new Error('redis is down'));
+      const page = await app.request('GET', '/page?edit=true', { headers: html, cookies: {} }),
+        login = await app.request('GET', '/_auth/login', { headers: html, cookies: {} });
+
+      assert.deepEqual([page.status, page.location], [302, loginPage]); // not the round trip to google
+      assert.deepEqual([login.status, /Signing in is not available right now/.test(login.body)], [200, true]);
+
+      app.store.emit('connect');
+      assert.equal((await app.request('GET', '/page?edit=true', { headers: html, cookies: {} })).location, 'http://localhost:3000/_auth/google');
+    }));
+
     it('does nothing for a provider the site does not have, or when it is not set', async () => {
       const app = await make();
 

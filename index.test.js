@@ -123,6 +123,11 @@ describe('index', () => {
         assert.equal(redirectOf(opening({ accepts: undefined })), 'http://domain.com/_auth/login');
       });
 
+      it('keeps the login page when there is no session (the session store is down), which says signing in is not available', () => {
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(opening({ session: undefined })), 'http://domain.com/_auth/login');
+      });
+
       it('keeps the login page when the provider is not one the site has, or is not one to sign in with', () => {
         ['ldap', 'twitter', 'local', 'apikey', 'constructor'].forEach(name => {
           process.env.CLAY_AUTH_AUTO_LOGIN = name;
