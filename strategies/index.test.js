@@ -3,6 +3,7 @@
 const { describe, it, mock } = require('node:test'),
   assert = require('node:assert/strict'),
   passport = require('passport'),
+  Module = require('module'),
   strategies = require('./index'),
   site = { slug: 'site', prefix: 'foo.com', protocol: 'http', port: 80, path: '/' },
   loaded = () => Object.keys(require.cache).filter(file => /node_modules\/(passport-[a-z0-9-]+|aws-sdk)\//.test(file)).map(file => file.match(/node_modules\/([^/]+)\//)[1]);
@@ -36,6 +37,43 @@ describe('strategies', () => {
       assert.throws(() => strategies.createStrategy(['nope'], site), { message: 'Unknown provider: nope!' });
       assert.throws(() => strategies.createStrategy(['constructor'], site), { message: 'Unknown provider: constructor!' });
       use.mock.restore();
+    });
+
+    describe('ldap, which needs the optional passport-ldapauth package', () => {
+      // runs createStrategy(['ldap']) as if requiring passport-ldapauth threw what the test says
+      const withLdapPackage = (error, check) => {
+        const file = require.resolve('./ldap'),
+          cached = require.cache[file],
+          original = Module._load,
+          load = mock.method(Module, '_load', function (...args) {
+            if (args[0] === 'passport-ldapauth') throw error;
+            return original.apply(this, args);
+          }),
+          use = mock.method(passport, 'use', () => {});
+
+        delete require.cache[file];
+        try {
+          check();
+        } finally {
+          load.mock.restore();
+          use.mock.restore();
+          if (cached) require.cache[file] = cached;
+        }
+      };
+
+      it('says how to install it when it is not installed', () => {
+        withLdapPackage(Object.assign(new Error("Cannot find module 'passport-ldapauth'"), { code: 'MODULE_NOT_FOUND' }), () => {
+          assert.throws(() => strategies.createStrategy(['ldap'], site), {
+            message: 'Provider ldap needs the passport-ldapauth package, which is not installed with amphora-auth. Run: npm install passport-ldapauth@^2.1.1'
+          });
+        });
+      });
+
+      it('does not hide any other error', () => {
+        withLdapPackage(new Error('something else broke'), () => {
+          assert.throws(() => strategies.createStrategy(['ldap'], site), { message: 'something else broke' });
+        });
+      });
     });
 
     it('says which providers were removed, and what is left', () => {

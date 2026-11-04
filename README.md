@@ -29,7 +29,7 @@ amphoraAuth({
 This module provides local authentication in Clay with a username and password and allows for easy configuration of Oauth for authentication with third-party providers. Here's a list of the supported providers:
 
 - Google
-- LDAP
+- LDAP (needs `npm install passport-ldapauth@^2.1.1`: it is an optional peer dependency, so it is not installed with this module)
 
 Twitter, Slack and Cognito sign-in were removed in version 3. A site that still lists one of them gets an error at startup that says so.
 
@@ -97,7 +97,7 @@ Anything that depends on the id staying the same, like an auth proxy that signs 
 
 ## Requirements
 
-Node 26.12.1 or later. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded.
+Node 26.12.1 or later. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded. LDAP also needs the optional `passport-ldapauth` package (see above).
 
 ## License
 

@@ -44,13 +44,21 @@
     "passport": "^0.7.0",
     "passport-google-oauth": "^1.0.0",
     "passport-http-header-token": "^1.1.0",
-    "passport-ldapauth": "^2.1.1",
     "passport-local": "^1.0.0"
+  },
+  "peerDependencies": {
+    "passport-ldapauth": "^2.1.1"
+  },
+  "peerDependenciesMeta": {
+    "passport-ldapauth": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.13.0",
     "express": "^4.22.3",
-    "globals": "^16.5.0"
+    "globals": "^16.5.0",
+    "passport-ldapauth": "^2.1.1"
   }
 }
