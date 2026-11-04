@@ -97,7 +97,7 @@ Anything that depends on the id staying the same, like an auth proxy that signs 
 
 ## Requirements
 
-Node 26.12.1 or later. `clayhandlebars` 5 or 6 is a peer dependency. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded.
+Node 26.12.1 or later. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded.
 
 ## License
 
