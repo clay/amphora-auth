@@ -86,8 +86,50 @@ describe('session-store', () => {
       store.on('disconnect', () => events.push('disconnect'));
       store.on('connect', () => events.push('connect'));
       createSessionStore.getRedisClient().emit('error', new Error('connection lost'));
-      createSessionStore.getRedisClient().emit('connect');
+      createSessionStore.getRedisClient().emit('ready');
       assert.deepEqual(events, ['disconnect', 'connect']);
+    });
+
+    it('does not call a connection that closes and is back at once (a blip) disconnected', async () => {
+      const store = createSessionStore.getRedisStore(),
+        events = [],
+        onDisconnect = () => events.push('disconnect'),
+        onConnect = () => events.push('connect'),
+        back = new Promise(resolve => store.once('connect', resolve));
+
+      await createSessionStore.getRedisClient().ping();
+      store.on('disconnect', onDisconnect);
+      store.on('connect', onConnect);
+      redis.dropConnections(); // a connection closed by the server: no error, just a close, then a new connection
+      await back;
+      store.off('disconnect', onDisconnect);
+      store.off('connect', onConnect);
+      assert.deepEqual(events, ['connect']);
+    });
+
+    it('calls a connection that is still closed after a second disconnected, and connected again when it is ready', t => {
+      const store = createSessionStore.getRedisStore(),
+        client = createSessionStore.getRedisClient(),
+        events = [],
+        onDisconnect = () => events.push('disconnect'),
+        onConnect = () => events.push('connect');
+
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      store.on('disconnect', onDisconnect);
+      store.on('connect', onConnect);
+      client.emit('close');
+      t.mock.timers.tick(999);
+      assert.deepEqual(events, []);
+      t.mock.timers.tick(1);
+      assert.deepEqual(events, ['disconnect']);
+      client.emit('ready');
+      client.emit('close');
+      t.mock.timers.tick(500);
+      client.emit('ready'); // back before the second is over: the wait for the first close is over, the store never went down
+      t.mock.timers.tick(1000);
+      assert.deepEqual(events, ['disconnect', 'connect', 'connect']);
+      store.off('disconnect', onDisconnect);
+      store.off('connect', onConnect);
     });
   });
 });

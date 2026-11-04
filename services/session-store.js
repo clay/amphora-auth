@@ -7,7 +7,8 @@ let session = require('express-session'),
 const { isEmpty } = require('../lib/helpers'),
   { SECRET } = require('../constants'),
   { REDIS_DB, REDIS_SESSION_HOST } = process.env,
-  sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:';
+  sessionPrefix = REDIS_DB ? `${REDIS_DB}-clay-session:` : 'clay-session:',
+  BLIP_MS = 1000; // a lost connection that is not back after this long is an outage, not a blip
 
 /**
  * Creates the Redis store, connecting to REDIS_SESSION_HOST (a redis:// or rediss:// url, localhost when it isn't set).
@@ -22,10 +23,24 @@ function createRedisStore() {
 
   redisClient = client;
 
+  let closed;
+
   // express-session stops using a store that says it is disconnected (requests go on without a session)
-  // and starts again when it says it is connected, so Redis going down doesn't hold requests up
+  // and starts again when it says it is connected, so Redis going down doesn't hold requests up.
+  // ioredis says 'close' the moment a connection that was working is lost, and reconnects a few dozen milliseconds
+  // later: that is a blip that requests should wait through, so the store is only called disconnected when the
+  // connection is still not back after a second (an 'error' means the next attempt failed, which is not a blip, and
+  // can come much later when the network just drops packets). 'ready' is when commands can be sent again
   client.on('error', error => store.emit('disconnect', error));
-  client.on('connect', () => store.emit('connect'));
+  client.on('close', () => {
+    clearTimeout(closed);
+    closed = setTimeout(() => store.emit('disconnect'), BLIP_MS);
+    closed.unref();
+  });
+  client.on('ready', () => {
+    clearTimeout(closed);
+    store.emit('connect');
+  });
 
   return store;
 }
