@@ -54,6 +54,10 @@ And import the configuration using [claycli](https://github.com/clay/claycli):
 cat user.yml | clay import -k <local_api_key> -y localhost
 ```
 
+### Which requests need a sign in
+
+Edit mode (`?edit=true`) and every method other than `GET` and `HEAD` need a sign in (or an API key), except routes whose path contains `/_auth`: the sign in routes, and routes you name that way so they stay open (for example a webhook at `/hooks/_auth/notify`). Only the path that express routes the request on counts, not the query string. A route that stays open this way runs for anyone, so it has to check `req.user` (or use `withAuthLevel`) itself before it changes anything.
+
 ## Environmental Variables
 
 The following env variables are required in order to be able to authenticate a user through the providers:
@@ -79,6 +83,8 @@ export REDIS_DB=<name>                                 # the keys start with <na
 export CLAY_SESSION_SECRET=<secret>                    # signs the clay-session cookie. Set it: the default is not a secret
 ```
 
+The `clay-session` cookie is `Secure`, `HttpOnly` and `SameSite=Lax`, and lasts a week from the last request.
+
 The following env variables are optional:
 
 This flag, when true, will prevent users from either going into edit mode or making any edits to a page they had already opened in edit mode in their browsers. This environment variable is optional and you can set it up from your Clay instance and it'll be picked up here since it'll share the same env file!
@@ -103,7 +109,11 @@ When a site has one provider that people sign in with, they can go straight to i
 export CLAY_AUTH_AUTO_LOGIN=google   # a provider of the site: google, or ldap
 ```
 
-Someone who opens a page that needs a sign in (edit mode) is sent to that provider and comes back to the page. If they are signed in at the provider already (with Google, in the same browser) that takes no clicks, on every site of the instance. Scripts that ask for JSON, writes and everything else still go to the login page, and so does someone who comes back from a failed sign in, so there is no loop. Each site's callback url still has to be registered with the provider.
+Someone who opens a page that needs a sign in (edit mode) is sent to that provider and comes back to the page. If they are signed in at the provider already (with Google, in the same browser) that takes no clicks, on every site of the instance. Each site's callback url still has to be registered with the provider.
+
+Only a browser opening a page counts: a navigation to a document, as browsers say in `Sec-Fetch-Mode` and `Sec-Fetch-Dest`, or, from a client that doesn't send those, a request that asks for HTML before JSON. Scripts (fetch, XMLHttpRequest, JSON clients), frames, writes and everything else still go to the login page, and so does someone who comes back from a failed sign in, so there is no loop. Signing out ends the session on the site, not at the provider, so the next page that needs a sign in signs them in again.
+
+Don't combine it with `CLAY_SESSION_REGENERATE` when the provider's callback is served by another host (an auth proxy): the sign in lands on another session, and the page sends the browser back to the provider again and again.
 
 ## Requirements
 
