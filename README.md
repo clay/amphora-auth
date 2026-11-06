@@ -95,6 +95,16 @@ export CLAY_SESSION_REGENERATE=true
 
 Anything that depends on the id staying the same, like an auth proxy that signs in a session on behalf of another host, doesn't work with it on.
 
+### Skipping the login page
+
+When a site has one provider that people sign in with, they can go straight to it instead of clicking through the login page:
+
+```bash
+export CLAY_AUTH_AUTO_LOGIN=google   # a provider of the site: google, or ldap
+```
+
+Someone who opens a page that needs a sign in (edit mode) is sent to that provider and comes back to the page. If they are signed in at the provider already (with Google, in the same browser) that takes no clicks, on every site of the instance. Scripts that ask for JSON, writes and everything else still go to the login page, and so does someone who comes back from a failed sign in, so there is no loop. Each site's callback url still has to be registered with the provider.
+
 ## Requirements
 
 Node 26.12.1 or later. The Google, LDAP, local and API key strategies are loaded when a site uses them, so only the ones in use are loaded. LDAP also needs the optional `passport-ldapauth` package (see above).

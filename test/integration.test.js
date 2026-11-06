@@ -300,6 +300,101 @@ describe('integration', () => {
     });
   });
 
+  describe('routes that are open', () => {
+    it('needs a sign in for a route that has no check of its own, whatever the query string says', async () => {
+      const app = await make();
+
+      for (const path of ['/open', '/open?x=/_auth', '/open?next=/_auth/local', '/api/thing?x=/_auth']) {
+        const res = await app.request(path.startsWith('/api') ? 'PUT' : 'POST', path, { cookies: {} });
+
+        assert.deepEqual([res.status, res.location], [302, loginPage], path);
+      }
+    });
+
+    it('keeps a route with /_auth in its path open, as before', async () => {
+      const app = await make(),
+        res = await app.request('POST', '/hooks/_auth/notify', { cookies: {} });
+
+      assert.deepEqual([res.status, res.body], [200, { reached: 'auth in the name' }]);
+    });
+
+    it('lets a signed in user reach a route whose query string has /_auth in it', async () => {
+      const app = await make();
+
+      await app.request('POST', '/_auth/local', { body: login, form: true });
+      const res = await app.request('PUT', '/api/thing?x=/_auth', { body: {} });
+
+      assert.deepEqual([res.status, res.body], [200, { ok: 'write' }]);
+    });
+  });
+
+  describe('signing in without the login page (CLAY_AUTH_AUTO_LOGIN)', () => {
+    const html = { accept: 'text/html,application/xhtml+xml' },
+      withAutoLogin = async (provider, test) => {
+        process.env.CLAY_AUTH_AUTO_LOGIN = provider;
+        try {
+          await test();
+        } finally {
+          delete process.env.CLAY_AUTH_AUTO_LOGIN;
+        }
+      };
+
+    it('sends a page request to google, and back to the page when google signs the user in', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] }),
+        page = await app.request('GET', '/page?edit=true', { headers: html }),
+        google = await app.request('GET', '/_auth/google'),
+        callback = await app.request('GET', '/_auth/google/callback?code=abc'),
+        signedIn = await app.request('GET', '/page');
+
+      assert.deepEqual([page.status, page.location], [302, 'http://localhost:3000/_auth/google']);
+      assert.match(google.location, /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/);
+      assert.deepEqual([callback.status, callback.location], [302, '/page?edit=true']);
+      assert.deepEqual(signedIn.body, { user: 'google.user@example.com', auth: 'admin' });
+    }));
+
+    it('still shows the login page to a script that waits for json, and for writes', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] }),
+        json = await app.request('GET', '/page?edit=true', { headers: { accept: 'application/json' }, cookies: {} }),
+        write = await app.request('PUT', '/api/thing', { headers: html, cookies: {}, body: {} });
+
+      assert.deepEqual([json.location, write.location], [loginPage, loginPage]);
+    }));
+
+    it('shows the login page again, once, when google does not know the user (no loop)', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'], googleProfile: { sub: '2', email: 'stranger@example.com' } });
+
+      await app.request('GET', '/page?edit=true', { headers: html });
+      const callback = await app.request('GET', '/_auth/google/callback?code=abc'),
+        login = await app.request('GET', '/_auth/login', { headers: html });
+
+      assert.deepEqual([callback.status, callback.location], [302, loginPage]);
+      assert.deepEqual([login.status, /User not found!/.test(login.body)], [200, true]);
+    }));
+
+    it('shows the login page, which says signing in is not available, while the session store is down', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] });
+
+      app.store.emit('disconnect', new Error('redis is down'));
+      const page = await app.request('GET', '/page?edit=true', { headers: html, cookies: {} }),
+        login = await app.request('GET', '/_auth/login', { headers: html, cookies: {} });
+
+      assert.deepEqual([page.status, page.location], [302, loginPage]); // not the round trip to google
+      assert.deepEqual([login.status, /Signing in is not available right now/.test(login.body)], [200, true]);
+
+      app.store.emit('connect');
+      assert.equal((await app.request('GET', '/page?edit=true', { headers: html, cookies: {} })).location, 'http://localhost:3000/_auth/google');
+    }));
+
+    it('does nothing for a provider the site does not have, or when it is not set', async () => {
+      const app = await make();
+
+      assert.equal((await app.request('GET', '/page?edit=true', { headers: html, cookies: {} })).location, loginPage);
+      await withAutoLogin('google', async () => {
+        assert.equal((await app.request('GET', '/page?edit=true', { headers: html, cookies: {} })).location, loginPage); // this site has no google
+      });
+    });
+  });
+
   describe('when the session store is down', () => {
     it('serves public pages and the api, and sends editing to the login page, until it is back', async () => {
       const app = await make();
