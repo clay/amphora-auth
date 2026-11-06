@@ -35,12 +35,25 @@ function routedPath(req) {
 
 /**
  * where to come back to after signing in: the url of the request, always as a path of this site (a url that starts
- * with // or /\ would be read as another host)
+ * with // or /\ would be read as another host). A request that names the whole url (http://host/page) comes back to
+ * its path and query string
  * @param {object} req
  * @returns {string}
  */
 function returnToOf(req) {
-  return `/${String(req.originalUrl || '').replace(/^[/\\]+/, '')}`;
+  let url = String(req.originalUrl || '');
+
+  if (url && !url.startsWith('/')) {
+    try {
+      const { pathname, search } = new URL(url);
+
+      url = `${pathname}${search}`;
+    } catch (e) {
+      url = '';
+    }
+  }
+
+  return `/${url.replace(/^[/\\]+/, '')}`;
 }
 
 /**

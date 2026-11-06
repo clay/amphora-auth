@@ -94,7 +94,15 @@ describe('index', () => {
     });
 
     it('remembers the page as a path of this site, even when the url starts with // or /\\', () => {
-      [['//elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'], ['/\\elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'], ['///x?edit=true', '/x?edit=true'], ['/', '/']].forEach(([originalUrl, returnTo]) => {
+      [
+        ['//elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'],
+        ['/\\elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'],
+        ['///x?edit=true', '/x?edit=true'],
+        ['/', '/'],
+        ['http://localhost/page?edit=true', '/page?edit=true'], // a request that names the whole url
+        ['https://elsewhere.example//other.example/x?edit=true', '/other.example/x?edit=true'],
+        ['*', '/']
+      ].forEach(([originalUrl, returnTo]) => {
         const req = { isAuthenticated: () => false, get: () => undefined, originalUrl, session: {} };
 
         lib.isAuthenticated(site)(req, createRes(), () => assert.fail('next'));

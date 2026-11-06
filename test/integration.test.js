@@ -93,6 +93,15 @@ describe('integration', () => {
       }
     });
 
+    it('comes back to the path and query string of a request that names the whole url', async () => {
+      const app = await make();
+
+      await app.request('GET', 'http://localhost/page?edit=true');
+      const signedIn = await app.request('POST', '/_auth/local', { body: login, form: true });
+
+      assert.deepEqual([signedIn.status, signedIn.location], [302, '/page?edit=true']);
+    });
+
     it('takes the login as json too, and goes to the site when there was nowhere to go', async () => {
       const app = await make(),
         signedIn = await app.request('POST', '/_auth/local', { body: login });
