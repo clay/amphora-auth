@@ -41,8 +41,8 @@ describe('integration', () => {
         edit = await app.request('GET', '/page?edit=true');
 
       assert.deepEqual([edit.status, edit.location], [302, loginPage]);
-      assert.deepEqual(app.store.dump(), [{ cookie: { originalMaxAge: 604800000, secure: true, httpOnly: true, path: '/' }, returnTo: '/page?edit=true' }]);
-      assert.match(edit.cookies[0], /^clay-session=[^;]+; Path=\/; Expires=[^;]+; HttpOnly; Secure$/);
+      assert.deepEqual(app.store.dump(), [{ cookie: { originalMaxAge: 604800000, secure: true, httpOnly: true, path: '/', sameSite: 'lax' }, returnTo: '/page?edit=true' }]);
+      assert.match(edit.cookies[0], /^clay-session=[^;]+; Path=\/; Expires=[^;]+; HttpOnly; Secure; SameSite=Lax$/);
     });
 
     it('shows the login page', async () => {
@@ -80,6 +80,26 @@ describe('integration', () => {
       assert.deepEqual(edit.body, { user: 'bob', auth: 'admin' });
       assert.deepEqual(sessions.map(s => s.passport), [{ user: encode('bob', 'local') }]);
       assert.equal(sessions[0].returnTo, undefined);
+    });
+
+    it('comes back to a path of this site, even from a url that starts with //', async () => {
+      for (const target of ['//elsewhere.example/x?edit=true', '///elsewhere.example/x?edit=true']) {
+        const app = await make();
+
+        await app.request('GET', target);
+        const signedIn = await app.request('POST', '/_auth/local', { body: login, form: true });
+
+        assert.deepEqual([signedIn.status, signedIn.location], [302, '/elsewhere.example/x?edit=true'], target);
+      }
+    });
+
+    it('comes back to the path and query string of a request that names the whole url', async () => {
+      const app = await make();
+
+      await app.request('GET', 'http://localhost/page?edit=true');
+      const signedIn = await app.request('POST', '/_auth/local', { body: login, form: true });
+
+      assert.deepEqual([signedIn.status, signedIn.location], [302, '/page?edit=true']);
     });
 
     it('takes the login as json too, and goes to the site when there was nowhere to go', async () => {
@@ -311,6 +331,16 @@ describe('integration', () => {
       }
     });
 
+    it('needs a sign in whatever the request target adds to the path: a #fragment, or the scheme and host of a whole url', async () => {
+      const app = await make();
+
+      for (const target of ['/open#/_auth', 'http://localhost/open#/_auth', 'http://_auth/open', 'http://_auth@localhost/open']) {
+        const res = await app.request('POST', target, { cookies: {} });
+
+        assert.deepEqual([res.status, res.location], [302, loginPage], target);
+      }
+    });
+
     it('keeps a route with /_auth in its path open, as before', async () => {
       const app = await make(),
         res = await app.request('POST', '/hooks/_auth/notify', { cookies: {} });
@@ -350,6 +380,19 @@ describe('integration', () => {
       assert.match(google.location, /^https:\/\/accounts\.google\.com\/o\/oauth2\/v2\/auth\?/);
       assert.deepEqual([callback.status, callback.location], [302, '/page?edit=true']);
       assert.deepEqual(signedIn.body, { user: 'google.user@example.com', auth: 'admin' });
+    }));
+
+    it('goes by what the browser says it is opening, and keeps the login page for fetch and for requests that take anything', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] }),
+        browser = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        to = async headers => (await app.request('GET', '/page?edit=true', { headers, cookies: {} })).location;
+
+      assert.equal(await to({ accept: browser, 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }), 'http://localhost:3000/_auth/google');
+      assert.equal(await to({ accept: browser }), 'http://localhost:3000/_auth/google'); // no Sec-Fetch headers (plain http)
+      assert.equal(await to({ accept: '*/*', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }), loginPage); // fetch()
+      assert.equal(await to({ accept: browser, 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'iframe' }), loginPage);
+      assert.equal(await to({ accept: '*/*' }), loginPage);
+      assert.equal(await to({}), loginPage); // no Accept at all
     }));
 
     it('still shows the login page to a script that waits for json, and for writes', () => withAutoLogin('google', async () => {

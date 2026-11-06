@@ -20,35 +20,86 @@ const passport = require('passport'),
   KEEPS_SESSION_INFO = Symbol('keepsSessionInfo');
 
 /**
- * the url of a request without its query string
- * @param {string} [url]
+ * the path that express routes a request on: without its query string, a #fragment, or the scheme and host of a
+ * request that names the whole url. A request that has no path (as in tests) is read from its url, up to the query string
+ * @param {object} req
  * @returns {string}
  */
-function withoutQuery(url = '') {
-  return String(url).split('?')[0];
+function routedPath(req) {
+  if (typeof req.path === 'string') {
+    return `${req.baseUrl || ''}${req.path}`;
+  }
+
+  return typeof req.originalUrl === 'string' ? req.originalUrl.split('?')[0] : req.originalUrl;
+}
+
+/**
+ * where to come back to after signing in: the url of the request, always as a path of this site (a url that starts
+ * with // or /\ would be read as another host). A request that names the whole url (http://host/page) comes back to
+ * its path and query string
+ * @param {object} req
+ * @returns {string}
+ */
+function returnToOf(req) {
+  let url = String(req.originalUrl || '');
+
+  if (url && !url.startsWith('/')) {
+    try {
+      const { pathname, search } = new URL(url);
+
+      url = `${pathname}${search}`;
+    } catch (e) {
+      url = '';
+    }
+  }
+
+  return `/${url.replace(/^[/\\]+/, '')}`;
 }
 
 /**
  * determine if a route is protected
  * protected routes are ?edit=true and any method other than GET or HEAD, except the routes with /_auth in their path
- * (the sign in routes, and routes named for them). Only the path of the request counts, not its query string
+ * (the sign in routes, and routes named for them). Only the path that express routes the request on counts: not the
+ * query string, a #fragment, or the scheme and host of a request that names the whole url
  * @param {object} req
  * @returns {boolean}
  */
 function isProtectedRoute(req) {
   return (
     !!req.query.edit
-    || !includes(withoutQuery(req.originalUrl), '/_auth')
+    || !includes(routedPath(req), '/_auth')
     && !includes(['GET', 'HEAD'], req.method)
   );
 }
 
 /**
+ * whether a request is someone opening a page in a browser (a GET for a whole document), rather than a script (fetch,
+ * XMLHttpRequest, a json client), a frame or anything else. Browsers say which in Sec-Fetch-Mode and Sec-Fetch-Dest; a
+ * request without them (plain http, other clients) counts only when it asks for html before json. Not without a session
+ * (express-session leaves it out while the session store is down): signing in could not be kept, so the login page,
+ * which says so, is the better answer than a round trip to the provider
+ * @param {object} req
+ * @returns {boolean}
+ */
+function opensPage(req) {
+  if (req.method !== 'GET' || !req.session) {
+    return false;
+  }
+
+  const mode = req.get('Sec-Fetch-Mode'),
+    dest = req.get('Sec-Fetch-Dest');
+
+  if (mode) {
+    return mode === 'navigate' && (!dest || dest === 'document');
+  }
+
+  return typeof req.accepts === 'function' && req.accepts(['json', 'html']) === 'html';
+}
+
+/**
  * where someone who has to sign in is sent: the login page, or the provider itself when CLAY_AUTH_AUTO_LOGIN names one
- * of the providers of the site and the request is someone opening a page (not a script that waits for json), so
- * there is no login page to click through. Signing in at the provider is quick when they are signed in there already.
- * Not without a session (express-session leaves it out while the session store is down): signing in could not be kept,
- * so the login page, which says so, is the better answer than a round trip to the provider
+ * of the providers of the site and the request is someone opening a page, so there is no login page to click through.
+ * Signing in at the provider is quick when they are signed in there already
  * @param {object} req
  * @param {object} site
  * @param {string[]} providers
@@ -56,10 +107,9 @@ function isProtectedRoute(req) {
  */
 function signInUrl(req, site, providers) {
   const name = process.env.CLAY_AUTH_AUTO_LOGIN,
-    opensPage = req.method === 'GET' && !!req.session && typeof req.accepts === 'function' && req.accepts(['html', 'json']) === 'html',
-    provider = name && opensPage && getProviders(providers, site).find(current => current.name === name);
+    provider = name && getProviders(providers, site).find(current => current.name === name);
 
-  return provider ? provider.url : `${getAuthUrl(site)}/login`;
+  return provider && opensPage(req) ? provider.url : `${getAuthUrl(site)}/login`;
 }
 
 /**
@@ -84,7 +134,7 @@ function isAuthenticated(site, providers) {
       passport.authenticate('apikey', { session: false })(req, res, next);
     } else {
       // redirect to this page after logging in (there is no session to keep it in while the session store is down)
-      if (req.session) req.session.returnTo = req.originalUrl;
+      if (req.session) req.session.returnTo = returnToOf(req);
       // otherwise redirect to login
       res.redirect(signInUrl(req, site, providers));
     }

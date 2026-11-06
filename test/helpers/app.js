@@ -3,6 +3,7 @@
 // an express app wired the way amphora wires this package, and a small http client with a cookie jar
 
 const http = require('http'),
+  { text: readText } = require('stream/consumers'),
   express = require('express'),
   session = require('express-session'),
   passport = require('passport'),
@@ -105,10 +106,12 @@ async function build(options = {}) {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 
   /**
+   * sent with node's http client rather than fetch, which adds headers of its own (Accept, Sec-Fetch-Mode): a request
+   * carries only the headers a test gives it, and the path is sent as it is (a whole url, or with a #fragment)
    * @param {string} method
    * @param {string} path
    * @param {object} [opts] headers, body (an object), form (send it as a form), cookies (instead of the jar), keepCookies (false: don't remember what comes back)
-   * @returns {Promise<{status: number, location: string, cookies: string[], body: *}>}
+   * @returns {Promise<{status: number, location: string, cookies: string[], headers: object, body: *}>}
    */
   async function request(method, path, opts = {}) {
     const headers = { 'x-forwarded-proto': 'https', ...opts.headers },
@@ -127,9 +130,17 @@ async function build(options = {}) {
       headers['content-type'] = 'application/json';
     }
 
-    const res = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method, headers, body, redirect: 'manual' }),
-      text = await res.text(),
-      cookies = res.headers.getSetCookie();
+    if (body) {
+      headers['content-length'] = Buffer.byteLength(body);
+    }
+
+    const res = await new Promise((resolve, reject) => {
+        http.request({ host: '127.0.0.1', port: server.address().port, method, path, headers, agent: false }, resolve)
+          .on('error', reject)
+          .end(body);
+      }),
+      text = await readText(res),
+      cookies = res.headers['set-cookie'] || [];
 
     cookies.forEach(setCookie => {
       const [pair] = setCookie.split(';'),
@@ -148,7 +159,7 @@ async function build(options = {}) {
       // html or plain text
     }
 
-    return { status: res.status, location: res.headers.get('location'), cookies, headers: res.headers, body: parsed };
+    return { status: res.statusCode, location: res.headers.location || null, cookies, headers: res.headers, body: parsed };
   }
 
   return { request, store, storage, published, jar, close: () => new Promise(resolve => server.close(resolve)) };
