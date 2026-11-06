@@ -93,6 +93,15 @@ describe('index', () => {
       assert.deepEqual(res.calls, [['redirect', 'http://domain.com/_auth/login']]);
     });
 
+    it('remembers the page as a path of this site, even when the url starts with // or /\\', () => {
+      [['//elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'], ['/\\elsewhere.example/x?edit=true', '/elsewhere.example/x?edit=true'], ['///x?edit=true', '/x?edit=true'], ['/', '/']].forEach(([originalUrl, returnTo]) => {
+        const req = { isAuthenticated: () => false, get: () => undefined, originalUrl, session: {} };
+
+        lib.isAuthenticated(site)(req, createRes(), () => assert.fail('next'));
+        assert.equal(req.session.returnTo, returnTo, originalUrl);
+      });
+    });
+
     it('sends the user to the login page when there is no session to remember where they were going in (the session store is down)', () => {
       const req = { isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true' },
         res = createRes();

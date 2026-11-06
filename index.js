@@ -34,6 +34,16 @@ function routedPath(req) {
 }
 
 /**
+ * where to come back to after signing in: the url of the request, always as a path of this site (a url that starts
+ * with // or /\ would be read as another host)
+ * @param {object} req
+ * @returns {string}
+ */
+function returnToOf(req) {
+  return `/${String(req.originalUrl || '').replace(/^[/\\]+/, '')}`;
+}
+
+/**
  * determine if a route is protected
  * protected routes are ?edit=true and any method other than GET or HEAD, except the routes with /_auth in their path
  * (the sign in routes, and routes named for them). Only the path that express routes the request on counts: not the
@@ -90,7 +100,7 @@ function isAuthenticated(site, providers) {
       passport.authenticate('apikey', { session: false })(req, res, next);
     } else {
       // redirect to this page after logging in (there is no session to keep it in while the session store is down)
-      if (req.session) req.session.returnTo = req.originalUrl;
+      if (req.session) req.session.returnTo = returnToOf(req);
       // otherwise redirect to login
       res.redirect(signInUrl(req, site, providers));
     }

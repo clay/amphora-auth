@@ -82,6 +82,17 @@ describe('integration', () => {
       assert.equal(sessions[0].returnTo, undefined);
     });
 
+    it('comes back to a path of this site, even from a url that starts with //', async () => {
+      for (const target of ['//elsewhere.example/x?edit=true', '///elsewhere.example/x?edit=true']) {
+        const app = await make();
+
+        await app.request('GET', target);
+        const signedIn = await app.request('POST', '/_auth/local', { body: login, form: true });
+
+        assert.deepEqual([signedIn.status, signedIn.location], [302, '/elsewhere.example/x?edit=true'], target);
+      }
+    });
+
     it('takes the login as json too, and goes to the site when there was nowhere to go', async () => {
       const app = await make(),
         signedIn = await app.request('POST', '/_auth/local', { body: login });
