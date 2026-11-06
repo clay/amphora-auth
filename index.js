@@ -60,11 +60,33 @@ function isProtectedRoute(req) {
 }
 
 /**
+ * whether a request is someone opening a page in a browser (a GET for a whole document), rather than a script (fetch,
+ * XMLHttpRequest, a json client), a frame or anything else. Browsers say which in Sec-Fetch-Mode and Sec-Fetch-Dest; a
+ * request without them (plain http, other clients) counts only when it asks for html before json. Not without a session
+ * (express-session leaves it out while the session store is down): signing in could not be kept, so the login page,
+ * which says so, is the better answer than a round trip to the provider
+ * @param {object} req
+ * @returns {boolean}
+ */
+function opensPage(req) {
+  if (req.method !== 'GET' || !req.session) {
+    return false;
+  }
+
+  const mode = req.get('Sec-Fetch-Mode'),
+    dest = req.get('Sec-Fetch-Dest');
+
+  if (mode) {
+    return mode === 'navigate' && (!dest || dest === 'document');
+  }
+
+  return typeof req.accepts === 'function' && req.accepts(['json', 'html']) === 'html';
+}
+
+/**
  * where someone who has to sign in is sent: the login page, or the provider itself when CLAY_AUTH_AUTO_LOGIN names one
- * of the providers of the site and the request is someone opening a page (not a script that waits for json), so
- * there is no login page to click through. Signing in at the provider is quick when they are signed in there already.
- * Not without a session (express-session leaves it out while the session store is down): signing in could not be kept,
- * so the login page, which says so, is the better answer than a round trip to the provider
+ * of the providers of the site and the request is someone opening a page, so there is no login page to click through.
+ * Signing in at the provider is quick when they are signed in there already
  * @param {object} req
  * @param {object} site
  * @param {string[]} providers
@@ -72,10 +94,9 @@ function isProtectedRoute(req) {
  */
 function signInUrl(req, site, providers) {
   const name = process.env.CLAY_AUTH_AUTO_LOGIN,
-    opensPage = req.method === 'GET' && !!req.session && typeof req.accepts === 'function' && req.accepts(['html', 'json']) === 'html',
-    provider = name && opensPage && getProviders(providers, site).find(current => current.name === name);
+    provider = name && getProviders(providers, site).find(current => current.name === name);
 
-  return provider ? provider.url : `${getAuthUrl(site)}/login`;
+  return provider && opensPage(req) ? provider.url : `${getAuthUrl(site)}/login`;
 }
 
 /**

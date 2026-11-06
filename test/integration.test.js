@@ -373,6 +373,19 @@ describe('integration', () => {
       assert.deepEqual(signedIn.body, { user: 'google.user@example.com', auth: 'admin' });
     }));
 
+    it('goes by what the browser says it is opening, and keeps the login page for fetch and for requests that take anything', () => withAutoLogin('google', async () => {
+      const app = await make({ providers: ['google', 'apikey'] }),
+        browser = 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        to = async headers => (await app.request('GET', '/page?edit=true', { headers, cookies: {} })).location;
+
+      assert.equal(await to({ accept: browser, 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' }), 'http://localhost:3000/_auth/google');
+      assert.equal(await to({ accept: browser }), 'http://localhost:3000/_auth/google'); // no Sec-Fetch headers (plain http)
+      assert.equal(await to({ accept: '*/*', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' }), loginPage); // fetch()
+      assert.equal(await to({ accept: browser, 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'iframe' }), loginPage);
+      assert.equal(await to({ accept: '*/*' }), loginPage);
+      assert.equal(await to({}), loginPage); // no Accept at all
+    }));
+
     it('still shows the login page to a script that waits for json, and for writes', () => withAutoLogin('google', async () => {
       const app = await make({ providers: ['google', 'apikey'] }),
         json = await app.request('GET', '/page?edit=true', { headers: { accept: 'application/json' }, cookies: {} }),

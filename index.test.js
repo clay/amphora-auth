@@ -112,7 +112,7 @@ describe('index', () => {
 
     describe('with CLAY_AUTH_AUTO_LOGIN', () => {
       const providers = ['google', 'apikey'],
-        opening = (extra = {}) => ({ isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true', session: {}, method: 'GET', accepts: types => types[0], ...extra }),
+        opening = (extra = {}) => ({ isAuthenticated: () => false, get: () => undefined, originalUrl: '/page?edit=true', session: {}, method: 'GET', accepts: () => 'html', ...extra }),
         redirectOf = (req, withProviders = providers) => {
           const res = createRes();
 
@@ -138,9 +138,35 @@ describe('index', () => {
 
       it('keeps the login page for a script that wants json, for anything but a GET, and when it can not tell', () => {
         process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
-        assert.equal(redirectOf(opening({ accepts: types => types[1] })), 'http://domain.com/_auth/login');
+        assert.equal(redirectOf(opening({ accepts: () => 'json' })), 'http://domain.com/_auth/login');
         ['POST', 'PUT', 'DELETE', 'HEAD'].forEach(method => assert.equal(redirectOf(opening({ method })), 'http://domain.com/_auth/login', method));
         assert.equal(redirectOf(opening({ accepts: undefined })), 'http://domain.com/_auth/login');
+      });
+
+      it('goes by what the browser says it is opening: a document, not a fetch, an XMLHttpRequest or a frame', () => {
+        const navigation = headers => opening({ get: name => headers[name], accepts: () => assert.fail('accepts') });
+
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(navigation({ 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document' })), 'http://domain.com/_auth/google');
+        assert.equal(redirectOf(navigation({ 'Sec-Fetch-Mode': 'navigate' })), 'http://domain.com/_auth/google');
+        ['cors', 'no-cors', 'same-origin'].forEach(mode => {
+          assert.equal(redirectOf(navigation({ 'Sec-Fetch-Mode': mode, 'Sec-Fetch-Dest': 'empty' })), 'http://domain.com/_auth/login', mode);
+        });
+        assert.equal(redirectOf(navigation({ 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'iframe' })), 'http://domain.com/_auth/login');
+      });
+
+      it('without those headers, takes a request that asks for html before json for someone opening a page', () => {
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'google';
+        assert.equal(redirectOf(opening({ accepts: types => types.join() === 'json,html' && 'html' })), 'http://domain.com/_auth/google');
+        assert.equal(redirectOf(opening({ accepts: () => 'json' })), 'http://domain.com/_auth/login');
+      });
+
+      it('does not look at the request when it is not set, or names no provider of the site', () => {
+        const untouched = () => opening({ get: name => name === 'Authorization' ? undefined : assert.fail(name), accepts: () => assert.fail('accepts') });
+
+        assert.equal(redirectOf(untouched()), 'http://domain.com/_auth/login');
+        process.env.CLAY_AUTH_AUTO_LOGIN = 'ldap';
+        assert.equal(redirectOf(untouched()), 'http://domain.com/_auth/login');
       });
 
       it('keeps the login page when there is no session (the session store is down), which says signing in is not available', () => {
