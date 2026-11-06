@@ -56,7 +56,7 @@ cat user.yml | clay import -k <local_api_key> -y localhost
 
 ### Which requests need a sign in
 
-Edit mode (`?edit=true`) and every method other than `GET` and `HEAD` need a sign in (or an API key), except routes whose path contains `/_auth`: the sign in routes, and routes you name that way so they stay open (for example a webhook at `/hooks/_auth/notify`). Only the path that express routes the request on counts, not the query string. A route that stays open this way runs for anyone, so it has to check `req.user` (or use `withAuthLevel`) itself before it changes anything.
+Edit mode (`?edit=true`) and every method other than `GET`, `HEAD` and `OPTIONS` need a sign in (or an API key), except routes whose path contains `/_auth`: the sign in routes, and routes you name that way so they stay open (for example a webhook at `/hooks/_auth/notify`). Only the path that express routes the request on counts, not the query string. A route that stays open this way runs for anyone, so it has to check `req.user` (or use `withAuthLevel`) itself before it changes anything.
 
 ## Environmental Variables
 
