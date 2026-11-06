@@ -41,8 +41,8 @@ describe('integration', () => {
         edit = await app.request('GET', '/page?edit=true');
 
       assert.deepEqual([edit.status, edit.location], [302, loginPage]);
-      assert.deepEqual(app.store.dump(), [{ cookie: { originalMaxAge: 604800000, secure: true, httpOnly: true, path: '/' }, returnTo: '/page?edit=true' }]);
-      assert.match(edit.cookies[0], /^clay-session=[^;]+; Path=\/; Expires=[^;]+; HttpOnly; Secure$/);
+      assert.deepEqual(app.store.dump(), [{ cookie: { originalMaxAge: 604800000, secure: true, httpOnly: true, path: '/', sameSite: 'lax' }, returnTo: '/page?edit=true' }]);
+      assert.match(edit.cookies[0], /^clay-session=[^;]+; Path=\/; Expires=[^;]+; HttpOnly; Secure; SameSite=Lax$/);
     });
 
     it('shows the login page', async () => {
