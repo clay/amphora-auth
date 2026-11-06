@@ -53,6 +53,17 @@ describe('index', () => {
         assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl }), true, originalUrl);
       });
     });
+
+    it('decides from the path express routes on, not from a #fragment or the scheme and host of a whole url', () => {
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', baseUrl: '', path: '/open', originalUrl: '/open#/_auth' }), true);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', baseUrl: '', path: '/open', originalUrl: 'http://_auth/open' }), true);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', baseUrl: '/site', path: '/_auth/local', originalUrl: '/site/_auth/local' }), false);
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', baseUrl: '/_auth', path: '/x', originalUrl: '/_auth/x' }), false);
+    });
+
+    it('protects a request whose url is not a string, as before', () => {
+      assert.equal(lib.isProtectedRoute({ query: {}, method: 'POST', originalUrl: ['/_auth/login'] }), true);
+    });
   });
 
   describe('isAuthenticated', () => {

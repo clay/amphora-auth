@@ -311,6 +311,16 @@ describe('integration', () => {
       }
     });
 
+    it('needs a sign in whatever the request target adds to the path: a #fragment, or the scheme and host of a whole url', async () => {
+      const app = await make();
+
+      for (const target of ['/open#/_auth', 'http://localhost/open#/_auth', 'http://_auth/open', 'http://_auth@localhost/open']) {
+        const res = await app.request('POST', target, { cookies: {} });
+
+        assert.deepEqual([res.status, res.location], [302, loginPage], target);
+      }
+    });
+
     it('keeps a route with /_auth in its path open, as before', async () => {
       const app = await make(),
         res = await app.request('POST', '/hooks/_auth/notify', { cookies: {} });

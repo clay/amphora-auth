@@ -20,25 +20,31 @@ const passport = require('passport'),
   KEEPS_SESSION_INFO = Symbol('keepsSessionInfo');
 
 /**
- * the url of a request without its query string
- * @param {string} [url]
+ * the path that express routes a request on: without its query string, a #fragment, or the scheme and host of a
+ * request that names the whole url. A request that has no path (as in tests) is read from its url, up to the query string
+ * @param {object} req
  * @returns {string}
  */
-function withoutQuery(url = '') {
-  return String(url).split('?')[0];
+function routedPath(req) {
+  if (typeof req.path === 'string') {
+    return `${req.baseUrl || ''}${req.path}`;
+  }
+
+  return typeof req.originalUrl === 'string' ? req.originalUrl.split('?')[0] : req.originalUrl;
 }
 
 /**
  * determine if a route is protected
  * protected routes are ?edit=true and any method other than GET or HEAD, except the routes with /_auth in their path
- * (the sign in routes, and routes named for them). Only the path of the request counts, not its query string
+ * (the sign in routes, and routes named for them). Only the path that express routes the request on counts: not the
+ * query string, a #fragment, or the scheme and host of a request that names the whole url
  * @param {object} req
  * @returns {boolean}
  */
 function isProtectedRoute(req) {
   return (
     !!req.query.edit
-    || !includes(withoutQuery(req.originalUrl), '/_auth')
+    || !includes(routedPath(req), '/_auth')
     && !includes(['GET', 'HEAD'], req.method)
   );
 }
